@@ -13,6 +13,7 @@ from bot.helpers.botutils import send_message, delete_messages, get_args
 from bot.helpers.buttons import SmartButtons
 from bot.helpers.commands import BotCommands
 from bot.helpers.logger import LOGGER
+from bot.helpers.notify import Smart_Notify
 from bot.helpers.utils import new_task, clean_download
 from smartbindb import SmartBinDB
 from config import CC_GEN_LIMIT, MULTI_CCGEN_LIMIT
@@ -55,6 +56,7 @@ async def get_bin_info(bin, bot, message):
             return result
         else:
             LOGGER.error(f"SmartBinDB returned invalid response: {result}")
+            await Smart_Notify(bot, "/gen", f"SmartBinDB returned invalid response: {result}", message)
             await send_message(
                 chat_id=message.chat.id,
                 text="<b>Invalid Bin Provided ❌</b>",
@@ -63,6 +65,7 @@ async def get_bin_info(bin, bot, message):
             return None
     except Exception as e:
         LOGGER.error(f"Error fetching BIN info from SmartBinDB: {str(e)}")
+        await Smart_Notify(bot, "/gen", e, message)
         await send_message(
             chat_id=message.chat.id,
             text="<b>Invalid Bin Provided ❌</b>",
@@ -260,6 +263,7 @@ async def generate_handler(message: Message, bot: Bot):
                     text="<b>Please Provide A Valid Bin ❌</b>",
                     parse_mode=ParseMode.HTML
                 )
+                await Smart_Notify(bot, "/gen", "No BIN provided", message)
                 return
         bin, month, year, cvv, amount = parse_input(user_input)
         if not bin:
@@ -268,12 +272,14 @@ async def generate_handler(message: Message, bot: Bot):
                 text="<b>Sorry Bin Must Be 6-15 Digits ❌</b>",
                 parse_mode=ParseMode.HTML
             )
+            await Smart_Notify(bot, "/gen", f"Invalid BIN extracted: {user_input}", message)
             return
         if amount > CC_GEN_LIMIT:
             await progress_message.edit_text(
                 text=f"<b>You Can Only Generate Upto {CC_GEN_LIMIT} Credit Cards ❌</b>",
                 parse_mode=ParseMode.HTML
             )
+            await Smart_Notify(bot, "/gen", f"Amount exceeds CC_GEN_LIMIT: {amount}", message)
             await delete_messages(message.chat.id, progress_message.message_id)
             return
         if cvv is not None:
@@ -283,6 +289,7 @@ async def generate_handler(message: Message, bot: Bot):
                     text="<b>Invalid CVV format. CVV must be 4 digits for AMEX ❌</b>",
                     parse_mode=ParseMode.HTML
                 )
+                await Smart_Notify(bot, "/gen", f"Invalid CVV format for AMEX: {cvv}", message)
                 await delete_messages(message.chat.id, progress_message.message_id)
                 return
         clean_bin_for_api = bin[:6]
@@ -303,6 +310,7 @@ async def generate_handler(message: Message, bot: Bot):
                 text="<b>Sorry Bin Must Be 6-15 Digits ❌</b>",
                 parse_mode=ParseMode.HTML
             )
+            await Smart_Notify(bot, "/gen", f"No valid cards generated for BIN: {bin}", message)
             await delete_messages(message.chat.id, progress_message.message_id)
             return
         await delete_messages(message.chat.id, progress_message.message_id)
@@ -336,6 +344,7 @@ async def generate_handler(message: Message, bot: Bot):
                 LOGGER.info(f"Successfully sent credit card document to chat {message.chat.id}")
             except Exception as e:
                 LOGGER.error(f"Error sending document to chat {message.chat.id}: {str(e)}")
+                await Smart_Notify(bot, "/gen", e, message)
                 await send_message(
                     chat_id=message.chat.id,
                     text="<b>Sorry Bro API Response Unavailable</b>",
@@ -345,6 +354,7 @@ async def generate_handler(message: Message, bot: Bot):
                 clean_download()
     except Exception as e:
         LOGGER.error(f"Error in generate_handler for chat {message.chat.id}: {str(e)}")
+        await Smart_Notify(bot, "/gen", e, message)
         if progress_message:
             try:
                 await progress_message.edit_text(
@@ -354,6 +364,7 @@ async def generate_handler(message: Message, bot: Bot):
                 LOGGER.info(f"Edited progress message with error in chat {message.chat.id}")
             except TelegramBadRequest as edit_e:
                 LOGGER.error(f"Failed to edit progress message in chat {message.chat.id}: {str(edit_e)}")
+                await Smart_Notify(bot, "/gen", edit_e, message)
                 await send_message(
                     chat_id=message.chat.id,
                     text="<b>Sorry, an error occurred while generating cards ❌</b>",
@@ -388,8 +399,10 @@ async def auto_generate_handler(message: Message, bot: Bot):
     LOGGER.info(f"Auto-extracted BIN from reply: {extracted_bin}")
     bin, month, year, cvv, amount = parse_input(user_input)
     if not bin:
+        await Smart_Notify(bot, "/gen", f"Invalid BIN extracted: {user_input}", message)
         return
     if amount > CC_GEN_LIMIT:
+        await Smart_Notify(bot, "/gen", f"Amount exceeds CC_GEN_LIMIT: {amount}", message)
         await send_message(
             chat_id=message.chat.id,
             text=f"<b>You Can Only Generate Upto {CC_GEN_LIMIT} Credit Cards ❌</b>",
@@ -399,6 +412,7 @@ async def auto_generate_handler(message: Message, bot: Bot):
     if cvv is not None:
         is_amex = is_amex_bin(bin)
         if is_amex and len(cvv) != 4:
+            await Smart_Notify(bot, "/gen", f"Invalid CVV format for AMEX: {cvv}", message)
             await send_message(
                 chat_id=message.chat.id,
                 text="<b>Invalid CVV format. CVV must be 4 digits for AMEX ❌</b>",
@@ -429,6 +443,7 @@ async def auto_generate_handler(message: Message, bot: Bot):
             text="<b>Sorry Bin Must Be 6-15 Digits ❌</b>",
             parse_mode=ParseMode.HTML
         )
+        await Smart_Notify(bot, "/gen", f"No valid cards generated for BIN: {bin}", message)
         await delete_messages(message.chat.id, progress_message.message_id)
         return
     await delete_messages(message.chat.id, progress_message.message_id)
@@ -462,6 +477,7 @@ async def auto_generate_handler(message: Message, bot: Bot):
             LOGGER.info(f"Successfully sent auto-generated credit card document to chat {message.chat.id}")
         except Exception as e:
             LOGGER.error(f"Error sending document to chat {message.chat.id}: {str(e)}")
+            await Smart_Notify(bot, "/gen", e, message)
             await send_message(
                 chat_id=message.chat.id,
                 text="<b>Sorry Bro API Response Unavailable</b>",
@@ -484,6 +500,7 @@ async def regenerate_callback(callback_query: CallbackQuery, bot: Bot):
         data_parts = callback_query.data.split('|')
         if len(data_parts) != 7:
             await callback_query.answer("Invalid callback data", show_alert=True)
+            await Smart_Notify(bot, "regenerate_callback", "Invalid callback data", callback_query.message)
             return
         bin = data_parts[1].replace('_', ' ')
         month = data_parts[2] if data_parts[2] != 'xx' else None
@@ -493,17 +510,21 @@ async def regenerate_callback(callback_query: CallbackQuery, bot: Bot):
             amount = int(data_parts[5])
         except ValueError:
             await callback_query.answer("Invalid amount in callback data", show_alert=True)
+            await Smart_Notify(bot, "regenerate_callback", "Invalid amount in callback data", callback_query.message)
             return
         if not bin:
             await callback_query.answer("Sorry Bin Must Be 6-15 Digits ❌", show_alert=True)
+            await Smart_Notify(bot, "regenerate_callback", "No BIN provided", callback_query.message)
             return
         if amount > CC_GEN_LIMIT:
             await callback_query.answer(f"You can only generate up to {CC_GEN_LIMIT} credit cards ❌", show_alert=True)
+            await Smart_Notify(bot, "regenerate_callback", f"Amount exceeds CC_GEN_LIMIT: {amount}", callback_query.message)
             return
         if cvv is not None:
             is_amex = is_amex_bin(bin)
             if is_amex and len(cvv) != 4:
                 await callback_query.answer("Invalid CVV format. CVV must be 4 digits for AMEX ❌", show_alert=True)
+                await Smart_Notify(bot, "regenerate_callback", f"Invalid CVV format for AMEX: {cvv}", callback_query.message)
                 return
         clean_bin_for_api = bin[:6]
         bin_info = await get_bin_info(clean_bin_for_api, bot, callback_query.message)
@@ -519,6 +540,7 @@ async def regenerate_callback(callback_query: CallbackQuery, bot: Bot):
         cards = generate_credit_card(bin, amount, month, year, cvv)
         if not cards:
             await callback_query.answer("Sorry Bin Must Be 6-15 Digits ❌", show_alert=True)
+            await Smart_Notify(bot, "regenerate_callback", f"No valid cards generated for BIN: {bin}", callback_query.message)
             return
         if amount <= 10:
             card_text = "\n".join([f"<code>{card}</code>" for card in cards])
@@ -536,6 +558,7 @@ async def regenerate_callback(callback_query: CallbackQuery, bot: Bot):
                 LOGGER.info(f"Successfully sent regenerated credit card response to chat {callback_query.message.chat.id}")
             except TelegramBadRequest as edit_e:
                 LOGGER.error(f"Failed to edit message in chat {callback_query.message.chat.id}: {str(edit_e)}")
+                await Smart_Notify(bot, "regenerate_callback", edit_e, callback_query.message)
                 await send_message(
                     chat_id=callback_query.message.chat.id,
                     text=response_text,
@@ -559,6 +582,7 @@ async def regenerate_callback(callback_query: CallbackQuery, bot: Bot):
                 LOGGER.info(f"Successfully sent regenerated credit card document to chat {callback_query.message.chat.id}")
             except Exception as e:
                 LOGGER.error(f"Error sending document to chat {callback_query.message.chat.id}: {str(e)}")
+                await Smart_Notify(bot, "regenerate_callback", e, callback_query.message)
                 await send_message(
                     chat_id=callback_query.message.chat.id,
                     text="<b>Sorry Bro API Response Unavailable</b>",
@@ -568,6 +592,7 @@ async def regenerate_callback(callback_query: CallbackQuery, bot: Bot):
                 clean_download()
     except Exception as e:
         LOGGER.error(f"Error in regenerate_callback for chat {callback_query.message.chat.id}: {str(e)}")
+        await Smart_Notify(bot, "regenerate_callback", e, callback_query.message)
         await send_message(
             chat_id=callback_query.message.chat.id,
             text="<b>Sorry, an error occurred while regenerating cards ❌</b>",
