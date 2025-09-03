@@ -1,4 +1,4 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CopyTextButton
 from bot.helpers.logger import LOGGER
 
 class SmartButtons:
@@ -28,7 +28,10 @@ class SmartButtons:
         if switch_inline_query_chosen_chat is not None:
             kwargs["switch_inline_query_chosen_chat"] = switch_inline_query_chosen_chat
         if copy_text is not None:
-            kwargs["copy_text"] = copy_text
+            if isinstance(copy_text, str):
+                kwargs["copy_text"] = CopyTextButton(text=copy_text)
+            else:
+                kwargs["copy_text"] = copy_text
         if callback_game is not None:
             kwargs["callback_game"] = callback_game
 
