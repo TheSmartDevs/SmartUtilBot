@@ -2,7 +2,7 @@ import asyncio
 import pycountry
 from aiogram import Bot
 from aiogram.filters import Command
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CopyTextButton
+from aiogram.types import Message
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from bot import dp
@@ -117,7 +117,7 @@ async def fake_handler(message: Message, bot: Bot):
             f"<b>Click Below Button 👇</b>"
         )
         buttons = SmartButtons()
-        buttons.button(text="Copy Postal Code", copy_text=CopyTextButton(text=address['postal_code']))
+        buttons.button(text="Copy Postal Code", copy_text=address['postal_code'])
         await delete_messages(message.chat.id, [progress_message.message_id])
         await send_message(
             chat_id=message.chat.id,
