@@ -1,0 +1,208 @@
+{
+  "name": "SmartUtilBot",
+  "description": "A Smart Telegram Bot With Multi Functional Tools.",
+  "repository": "https://github.com/TheSmartDevs/SmartUtilBot",
+  "keywords": ["aiogram", "bot", "python", "telethon", "pyrogram", "tools"],
+  "env": {
+    "API_ID": {
+      "description": "Get from my.telegram.org. Required for Pyro Bot Client.",
+      "value": "Your_API_ID_Here",
+      "required": true
+    },
+    "API_HASH": {
+      "description": "Get from my.telegram.org. Required for Pyro Bot Client.",
+      "value": "Your_API_HASH_Here",
+      "required": true
+    },
+    "BOT_TOKEN": {
+      "description": "Get from @BotFather. Required for Pyro Bot Client.",
+      "value": "Your_BOT_TOKEN_Here",
+      "required": true
+    },
+    "SESSION_STRING": {
+      "description": "Generate from @ItsSmartToolBot. Required for secure session.",
+      "value": "Your_SESSION_STRING_Here",
+      "required": true
+    },
+    "DEVELOPER_USER_ID": {
+      "description": "Telegram User ID of the bot developer. Get from @ItsSmartToolBot using /info.",
+      "value": "Your_DEVELOPER_USER_ID_Here",
+      "required": true
+    },
+    "MONGO_URL": {
+      "description": "MongoDB URL for bot users database and broadcast.",
+      "value": "Your_MONGO_URL_Here",
+      "required": true
+    },
+    "DATABASE_URL": {
+      "description": "Database URL for group settings database.",
+      "value": "Your_DATABASE_URL_Here",
+      "required": true
+    },
+    "OPENAI_API_KEY": {
+      "description": "OpenAI API Key from OpenAI API Developer Console. Required for AI features.",
+      "value": "Your_OPENAI_API_KEY_Here",
+      "required": false
+    },
+    "REPLICATE_API_TOKEN": {
+      "description": "Replicate.com API token for AI image and LLM features.",
+      "value": "Your_REPLICATE_API_TOKEN_Here",
+      "required": false
+    },
+    "GOOGLE_API_KEY": {
+      "description": "Google API Key for Google-based services.",
+      "value": "Your_GOOGLE_API_KEY_Here",
+      "required": false
+    },
+    "TRANS_API_KEY": {
+      "description": "Translation API Key for translation services.",
+      "value": "Your_TRANS_API_KEY_Here",
+      "required": false
+    },
+    "OCR_API_KEY": {
+      "description": "OCR API Key for optical character recognition services.",
+      "value": "Your_OCR_API_KEY_Here",
+      "required": false
+    },
+    "MODEL_NAME": {
+      "description": "Model name for Gemini API.",
+      "value": "gemini-2.0-flash",
+      "required": false
+    },
+    "CC_SCRAPPER_LIMIT": {
+      "description": "Limit for CC scrapper. Higher may risk account ban.",
+      "value": "5000",
+      "required": false
+    },
+    "SUDO_CCSCR_LIMIT": {
+      "description": "Sudo CC scrapper limit. Higher may risk account ban.",
+      "value": "10000",
+      "required": false
+    },
+    "MULTI_CCSCR_LIMIT": {
+      "description": "Multi CC scrapper limit.",
+      "value": "2000",
+      "required": false
+    },
+    "MAIL_SCR_LIMIT": {
+      "description": "Mail scrapper limit.",
+      "value": "10000",
+      "required": false
+    },
+    "SUDO_MAILSCR_LIMIT": {
+      "description": "Sudo mail scrapper limit.",
+      "value": "15000",
+      "required": false
+    },
+    "CC_GEN_LIMIT": {
+      "description": "Credit card generation limit.",
+      "value": "2000",
+      "required": false
+    },
+    "MULTI_CCGEN_LIMIT": {
+      "description": "Multi credit card generation limit.",
+      "value": "5000",
+      "required": false
+    },
+    "TEXT_MODEL": {
+      "description": "Text model for GROQ API.",
+      "value": "deepseek-r1-distill-llama-70b",
+      "required": false
+    },
+    "GROQ_API_URL": {
+      "description": "GROQ API URL.",
+      "value": "https://api.groq.com/openai/v1/chat/completions",
+      "required": false
+    },
+    "GROQ_API_KEY": {
+      "description": "GROQ API Key from GROQ API Console.",
+      "value": "Your_GROK_API_KEY_Here",
+      "required": false
+    },
+    "A360APIBASEURL": {
+      "description": "Base URL for A360 API.",
+      "value": "https://a360api-c8fbf2fa3cda.herokuapp.com",
+      "required": false
+    },
+    "DOMAIN_API_KEY": {
+      "description": "Domain API Key from WhoisXMLAPI website console.",
+      "value": "Your_DOMAIN_API_KEY_Here",
+      "required": false
+    },
+    "DOMAIN_API_URL": {
+      "description": "Domain API URL from WhoisXMLAPI.",
+      "value": "https://www.whoisxmlapi.com/whoisserver/WhoisService",
+      "required": false
+    },
+    "UPDATE_CHANNEL_URL": {
+      "description": "Bot updates channel URL.",
+      "value": "t.me/TheSmartDev",
+      "required": false
+    },
+    "LOG_CHANNEL_ID": {
+      "description": "Bot log channel ID.",
+      "value": "-1002735511721",
+      "required": false
+    },
+    "COMMAND_PREFIX": {
+      "description": "Command prefixes separated by |.",
+      "value": "!|.|#|,|/",
+      "required": false
+    },
+    "DOMAIN_CHK_LIMIT": {
+      "description": "Max number of domains to check with WhoisAPI.",
+      "value": "20",
+      "required": false
+    },
+    "PROXY_CHECK_LIMIT": {
+      "description": "Max number of proxies to check.",
+      "value": "20",
+      "required": false
+    },
+    "IMGAI_SIZE_LIMIT": {
+      "description": "Max file size for image AI tools (bytes).",
+      "value": "5242880",
+      "required": false
+    },
+    "MAX_TXT_SIZE": {
+      "description": "Max text file size (bytes).",
+      "value": "15728640",
+      "required": false
+    },
+    "MAX_VIDEO_SIZE": {
+      "description": "Max video file size (bytes).",
+      "value": "2147483648",
+      "required": false
+    },
+    "YT_COOKIES_PATH": {
+      "description": "Path to YouTube Netscape cookies file.",
+      "value": "bot/SmartCookies/SmartUtilBot.txt",
+      "required": false
+    },
+    "VIDEO_RESOLUTION": {
+      "description": "Video resolution for YouTube downloads (e.g., 1280x720).",
+      "value": "1280x720",
+      "required": false
+    },
+    "IMAGE_UPLOAD_KEY": {
+      "description": "API key for image upload services.",
+      "value": "Your_IMAGE_UPLOAD_KEY_Here",
+      "required": false
+    },
+    "IPINFO_API_TOKEN": {
+      "description": "API token for IPinfo services.",
+      "value": "Your_IPINFO_API_TOKEN_Here",
+      "required": false
+    },
+    "WEB_SS_KEY": {
+      "description": "API key for web screenshot services.",
+      "value": "Your_WEB_SS_KEY_Here",
+      "required": false
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ]
+}
