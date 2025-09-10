@@ -4,6 +4,7 @@
 import asyncio
 import socket
 import aiohttp
+from urllib.parse import urlparse
 from aiogram import Bot
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -30,8 +31,13 @@ class HTTPProxyChecker:
             'headers': {'User-Agent': 'Mozilla/5.0', 'Authorization': f'Bearer {IPINFO_API_TOKEN}'}
         }
 
-    async def get_location(self, session, ip):
+    async def get_location(self, session, host):
         try:
+            try:
+                ip = socket.gethostbyname(host)
+            except Exception as e:
+                logger.error(f"DNS resolution failed for {host}: {e}")
+                return f"❌ DNS error"
             url = self.geo_service['url'].format(ip=ip)
             async with session.get(
                 url,
@@ -55,24 +61,37 @@ class HTTPProxyChecker:
             'status': 'Dead 🔴',
             'location': '• Not determined'
         }
-        ip, port = proxy.split(':')[:2]
-        port = int(port)
         try:
+            if "://" in proxy:
+                parsed = urlparse(proxy)
+                host = parsed.hostname
+                port = parsed.port
+            else:
+                parts = proxy.split(':')
+                host, port = parts[0], int(parts[1])
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(PROXY_TIMEOUT)
             await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: sock.connect((ip, port))
+                lambda: sock.connect((host, port))
             )
             sock.close()
             result['status'] = 'Live ✅'
-            result['ip'] = ip
+            result['ip'] = host
             async with aiohttp.ClientSession() as session:
-                result['location'] = await self.get_location(session, ip)
+                result['location'] = await self.get_location(session, host)
         except Exception as e:
             logger.error(f"Error checking proxy {proxy}: {e}")
-            async with aiohttp.ClientSession() as session:
-                result['location'] = await self.get_location(session, ip)
+            try:
+                if "://" in proxy:
+                    parsed = urlparse(proxy)
+                    host = parsed.hostname
+                else:
+                    host = proxy.split(':')[0]
+                async with aiohttp.ClientSession() as session:
+                    result['location'] = await self.get_location(session, host)
+            except Exception:
+                pass
         return result
 
 checker = HTTPProxyChecker()
@@ -127,7 +146,12 @@ async def px_command_handler(message: Message, bot: Bot):
                         proxies_to_check.append(('http', ip_port))
                         auth = {'username': username, 'password': password}
                     else:
-                        proxies_to_check.append(('http', proxy))
+                        if '://' in proxy:
+                            parts = proxy.split('://')
+                            if len(parts) == 2 and parts[0].lower() in ['http', 'https']:
+                                proxies_to_check.append((parts[0].lower(), parts[1]))
+                        else:
+                            proxies_to_check.append(('http', proxy))
         else:
             await send_message(
                 chat_id=message.chat.id,
