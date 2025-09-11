@@ -1,6 +1,6 @@
 # Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
+# SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
+# Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import re
 import os
 import random
@@ -21,6 +21,8 @@ from bot.helpers.utils import new_task, clean_download
 from bot.helpers.defend import SmartDefender
 from smartbindb import SmartBinDB
 from config import CC_GEN_LIMIT, MULTI_CCGEN_LIMIT
+
+smartdb = SmartBinDB()
 
 def is_amex_bin(bin_str):
     clean_bin = bin_str.replace('x', '').replace('X', '')
@@ -52,25 +54,29 @@ def extract_bin_from_text(text):
                 return digits_only
     return None
 
-async def get_bin_info(bin, bot, message):
+async def get_bin_info(bin: str, bot: Bot, message: Message):
     try:
-        smartdb = SmartBinDB()
         result = await smartdb.get_bin_info(bin)
         if result.get("status") == "SUCCESS" and result.get("data") and isinstance(result["data"], list) and len(result["data"]) > 0:
             return result
         else:
             LOGGER.error(f"SmartBinDB returned invalid response: {result}")
+            await Smart_Notify(bot, "gen", f"SmartBinDB invalid response: {result}", message)
             await send_message(
                 chat_id=message.chat.id,
-                text="<b>Invalid Bin Provided ❌</b>",
+                text="<b>Invalid or Unknown BIN Provided ❌</b>",
                 parse_mode=ParseMode.HTML
             )
             return None
     except Exception as e:
         LOGGER.error(f"Error fetching BIN info from SmartBinDB: {str(e)}")
+        error_message = "<b>Invalid or Unknown BIN Provided ❌</b>"
+        if "Binary database not found or empty" in str(e):
+            error_message = "<b>Binary database not found or corrupted. Please contact support ❌</b>"
+        await Smart_Notify(bot, "gen", e, message)
         await send_message(
             chat_id=message.chat.id,
-            text="<b>Invalid Bin Provided ❌</b>",
+            text=error_message,
             parse_mode=ParseMode.HTML
         )
         return None
@@ -199,15 +205,19 @@ def generate_custom_cards(bin, amount, month=None, year=None, cvv=None):
 
 def get_flag(country_code):
     try:
+        if not country_code or len(country_code) < 2:
+            return "Unknown", ""
+        country_code = country_code.upper()
+        if country_code in ['US1', 'US2']:
+            country_code = 'US'
         country = pycountry.countries.get(alpha_2=country_code)
         if not country:
-            raise ValueError("Invalid country code")
+            return "Unknown", ""
         country_name = country.name
         flag_emoji = chr(0x1F1E6 + ord(country_code[0]) - ord('A')) + chr(0x1F1E6 + ord(country_code[1]) - ord('A'))
         return country_name, flag_emoji
-    except Exception as e:
-        LOGGER.error(f"Error in get_flag: {str(e)}")
-        return "Unknown", "🚨"
+    except Exception:
+        return "Unknown", ""
 
 class BinPatternFilter(BaseFilter):
     async def __call__(self, message: Message):
@@ -379,108 +389,136 @@ async def generate_handler(message: Message, bot: Bot):
 @SmartDefender
 async def auto_generate_handler(message: Message, bot: Bot):
     LOGGER.info(f"Received auto-generate command from user {message.from_user.id if message.from_user else 'Unknown'} in chat {message.chat.id}")
-    user_id = message.from_user.id if message.from_user else None
-    user_full_name = "Anonymous"
-    if message.from_user:
-        user_full_name = message.from_user.first_name or "Anonymous"
-        if message.from_user.last_name:
-            user_full_name += f" {message.from_user.last_name}"
-    current_text = message.text or message.caption
-    if not current_text:
-        return
-    extracted_bin = extract_bin_from_text(current_text)
-    if not extracted_bin:
-        return
-    user_input = extracted_bin
-    LOGGER.info(f"Auto-extracted BIN from reply: {extracted_bin}")
-    bin, month, year, cvv, amount = parse_input(user_input)
-    if not bin:
-        await send_message(
-            chat_id=message.chat.id,
-            text="<b>Sorry Bin Must Be 6-15 Digits ❌</b>",
-            parse_mode=ParseMode.HTML
-        )
-        return
-    if amount > CC_GEN_LIMIT:
-        await send_message(
-            chat_id=message.chat.id,
-            text=f"<b>You Can Only Generate Upto {CC_GEN_LIMIT} Credit Cards ❌</b>",
-            parse_mode=ParseMode.HTML
-        )
-        return
-    if cvv is not None:
-        is_amex = is_amex_bin(bin)
-        if is_amex and len(cvv) != 4:
+    progress_message = None
+    try:
+        user_id = message.from_user.id if message.from_user else None
+        user_full_name = "Anonymous"
+        if message.from_user:
+            user_full_name = message.from_user.first_name or "Anonymous"
+            if message.from_user.last_name:
+                user_full_name += f" {message.from_user.last_name}"
+        current_text = message.text or message.caption
+        if not current_text:
+            return
+        extracted_bin = extract_bin_from_text(current_text)
+        if not extracted_bin:
+            return
+        user_input = extracted_bin
+        LOGGER.info(f"Auto-extracted BIN from reply: {extracted_bin}")
+        bin, month, year, cvv, amount = parse_input(user_input)
+        if not bin:
             await send_message(
                 chat_id=message.chat.id,
-                text="<b>Invalid CVV format. CVV must be 4 digits for AMEX ❌</b>",
+                text="<b>Sorry Bin Must Be 6-15 Digits ❌</b>",
                 parse_mode=ParseMode.HTML
             )
             return
-    clean_bin_for_api = bin[:6]
-    progress_message = await send_message(
-        chat_id=message.chat.id,
-        text="<b>Generating Credit Cards...</b>",
-        parse_mode=ParseMode.HTML
-    )
-    LOGGER.info("Auto-generating Credit Cards...")
-    bin_info = await get_bin_info(clean_bin_for_api, bot, message)
-    if not bin_info:
-        await delete_messages(message.chat.id, progress_message.message_id)
-        return
-    bank = bin_info["data"][0].get("issuer")
-    card_type = bin_info["data"][0].get("type", "Unknown")
-    card_scheme = bin_info["data"][0].get("brand", "Unknown")
-    bank_text = bank.upper() if bank else "Unknown"
-    country_code = bin_info["data"][0].get("country_code", "Unknown")
-    country_name, flag_emoji = get_flag(country_code)
-    bin_info_text = f"{card_scheme.upper()} - {card_type.upper()}"
-    cards = generate_credit_card(bin, amount, month, year, cvv)
-    if not cards:
-        await progress_message.edit_text(
-            text="<b>Sorry Bin Must Be 6-15 Digits ❌</b>",
-            parse_mode=ParseMode.HTML
-        )
-        return
-    await delete_messages(message.chat.id, progress_message.message_id)
-    if amount <= 10:
-        card_text = "\n".join([f"<code>{card}</code>" for card in cards])
-        response_text = f"<b>BIN ⇾</b> {bin}\n<b>Amount ⇾</b> {amount}\n\n{card_text}\n\n<b>Bank:</b> {bank_text}\n<b>Country:</b> {country_name} {flag_emoji}\n<b>BIN Info:</b> {bin_info_text}"
-        buttons = SmartButtons()
-        callback_data = f"regenerate|{bin.replace(' ', '_')}|{month if month else 'xx'}|{year if year else 'xx'}|{cvv if cvv else ('xxxx' if is_amex_bin(bin) else 'xxx')}|{amount}|{user_id if user_id else '0'}"
-        buttons.button(text="Re-Generate", callback_data=callback_data)
-        reply_markup = buttons.build_menu(b_cols=1)
-        await send_message(
-            chat_id=message.chat.id,
-            text=response_text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=reply_markup
-        )
-        LOGGER.info(f"Successfully sent auto-generated credit card response to chat {message.chat.id}")
-    else:
-        os.makedirs('./downloads', exist_ok=True)
-        file_name = f"./downloads/{bin}_x_{amount}.txt"
-        try:
-            with open(file_name, "w") as file:
-                file.write("\n".join(cards))
-            caption = f"<b>🔍 Multiple CC Generate Successful 📋</b>\n<b>━━━━━━━━━━━━━━━━</b>\n<b>BIN:</b> {bin}\n<b>BIN Info:</b> {bin_info_text}\n<b>Bank:</b> {bank_text}\n<b>Country:</b> {country_name} {flag_emoji}\n<b>━━━━━━━━━━━━━━━━</b>\n<b>👁 Thanks For Using Our Tool ✅</b>"
-            await bot.send_document(
-                chat_id=message.chat.id,
-                document=FSInputFile(path=file_name),
-                caption=caption,
-                parse_mode=ParseMode.HTML
-            )
-            LOGGER.info(f"Successfully sent auto-generated credit card document to chat {message.chat.id}")
-        except Exception as e:
-            LOGGER.error(f"Error sending document to chat {message.chat.id}: {str(e)}")
-            await Smart_Notify(bot, "/gen", e, message)
+        if amount > CC_GEN_LIMIT:
             await send_message(
                 chat_id=message.chat.id,
-                text="<b>Sorry Bro API Response Unavailable</b>",
+                text=f"<b>You Can Only Generate Upto {CC_GEN_LIMIT} Credit Cards ❌</b>",
                 parse_mode=ParseMode.HTML
             )
-        finally:
-            clean_download()
+            return
+        if cvv is not None:
+            is_amex = is_amex_bin(bin)
+            if is_amex and len(cvv) != 4:
+                await send_message(
+                    chat_id=message.chat.id,
+                    text="<b>Invalid CVV format. CVV must be 4 digits for AMEX ❌</b>",
+                    parse_mode=ParseMode.HTML
+                )
+                return
+        clean_bin_for_api = bin[:6]
+        progress_message = await send_message(
+            chat_id=message.chat.id,
+            text="<b>Generating Credit Cards...</b>",
+            parse_mode=ParseMode.HTML
+        )
+        LOGGER.info("Auto-generating Credit Cards...")
+        bin_info = await get_bin_info(clean_bin_for_api, bot, message)
+        if not bin_info:
+            await delete_messages(message.chat.id, progress_message.message_id)
+            return
+        bank = bin_info["data"][0].get("issuer")
+        card_type = bin_info["data"][0].get("type", "Unknown")
+        card_scheme = bin_info["data"][0].get("brand", "Unknown")
+        bank_text = bank.upper() if bank else "Unknown"
+        country_code = bin_info["data"][0].get("country_code", "Unknown")
+        country_name, flag_emoji = get_flag(country_code)
+        bin_info_text = f"{card_scheme.upper()} - {card_type.upper()}"
+        cards = generate_credit_card(bin, amount, month, year, cvv)
+        if not cards:
+            await progress_message.edit_text(
+                text="<b>Sorry Bin Must Be 6-15 Digits ❌</b>",
+                parse_mode=ParseMode.HTML
+            )
+            return
+        await delete_messages(message.chat.id, progress_message.message_id)
+        if amount <= 10:
+            card_text = "\n".join([f"<code>{card}</code>" for card in cards])
+            response_text = f"<b>BIN ⇾</b> {bin}\n<b>Amount ⇾</b> {amount}\n\n{card_text}\n\n<b>Bank:</b> {bank_text}\n<b>Country:</b> {country_name} {flag_emoji}\n<b>BIN Info:</b> {bin_info_text}"
+            buttons = SmartButtons()
+            callback_data = f"regenerate|{bin.replace(' ', '_')}|{month if month else 'xx'}|{year if year else 'xx'}|{cvv if cvv else ('xxxx' if is_amex_bin(bin) else 'xxx')}|{amount}|{user_id if user_id else '0'}"
+            buttons.button(text="Re-Generate", callback_data=callback_data)
+            reply_markup = buttons.build_menu(b_cols=1)
+            await send_message(
+                chat_id=message.chat.id,
+                text=response_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup
+            )
+            LOGGER.info(f"Successfully sent auto-generated credit card response to chat {message.chat.id}")
+        else:
+            os.makedirs('./downloads', exist_ok=True)
+            file_name = f"./downloads/{bin}_x_{amount}.txt"
+            try:
+                with open(file_name, "w") as file:
+                    file.write("\n".join(cards))
+                caption = f"<b>🔍 Multiple CC Generate Successful 📋</b>\n<b>━━━━━━━━━━━━━━━━</b>\n<b>BIN:</b> {bin}\n<b>BIN Info:</b> {bin_info_text}\n<b>Bank:</b> {bank_text}\n<b>Country:</b> {country_name} {flag_emoji}\n<b>━━━━━━━━━━━━━━━━</b>\n<b>👁 Thanks For Using Our Tool ✅</b>"
+                await bot.send_document(
+                    chat_id=message.chat.id,
+                    document=FSInputFile(path=file_name),
+                    caption=caption,
+                    parse_mode=ParseMode.HTML
+                )
+                LOGGER.info(f"Successfully sent auto-generated credit card document to chat {message.chat.id}")
+            except Exception as e:
+                LOGGER.error(f"Error sending document to chat {message.chat.id}: {str(e)}")
+                await Smart_Notify(bot, "/gen", e, message)
+                await send_message(
+                    chat_id=message.chat.id,
+                    text="<b>Sorry Bro API Response Unavailable</b>",
+                    parse_mode=ParseMode.HTML
+                )
+            finally:
+                clean_download()
+    except Exception as e:
+        LOGGER.error(f"Error in auto_generate_handler for chat {message.chat.id}: {str(e)}")
+        await Smart_Notify(bot, "/gen", e, message)
+        if progress_message:
+            try:
+                await progress_message.edit_text(
+                    text="<b>Sorry, an error occurred while generating cards ❌</b>",
+                    parse_mode=ParseMode.HTML
+                )
+                LOGGER.info(f"Edited progress message with error in chat {message.chat.id}")
+            except TelegramBadRequest as edit_e:
+                LOGGER.error(f"Failed to edit progress message in chat {message.chat.id}: {str(edit_e)}")
+                await Smart_Notify(bot, "/gen", edit_e, message)
+                await send_message(
+                    chat_id=message.chat.id,
+                    text="<b>Sorry, an error occurred while generating cards ❌</b>",
+                    parse_mode=ParseMode.HTML
+                )
+                LOGGER.info(f"Sent error message to chat {message.chat.id}")
+        else:
+            await send_message(
+                chat_id=message.chat.id,
+                text="<b>Sorry, an error occurred while generating cards ❌</b>",
+                parse_mode=ParseMode.HTML
+            )
+            LOGGER.info(f"Sent error message to chat {message.chat.id}")
 
 @dp.callback_query(lambda c: c.data.startswith("regenerate|"))
 @new_task
