@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 from aiogram import Bot
 from aiogram.filters import Command, BaseFilter
 from aiogram.types import Message, CallbackQuery
@@ -26,12 +23,25 @@ async def get_bin_info(bin: str, bot: Bot, message: Message):
         if result.get("status") == "SUCCESS" and result.get("data") and isinstance(result["data"], list) and len(result["data"]) > 0:
             return result
         else:
-            LOGGER.error(f"SmartBinDB returned invalid response for BIN: {bin} - {result}")
+            LOGGER.error(f"SmartBinDB returned invalid response: {result}")
             await Smart_Notify(bot, "extp", f"SmartBinDB invalid response: {result}", message)
+            await send_message(
+                chat_id=message.chat.id,
+                text="<b>Invalid or Unknown BIN Provided ❌</b>",
+                parse_mode=ParseMode.HTML
+            )
             return None
     except Exception as e:
-        LOGGER.error(f"Error fetching BIN info from SmartBinDB: {bin} - {str(e)}")
+        LOGGER.error(f"Error fetching BIN info from SmartBinDB: {str(e)}")
+        error_message = "<b>Invalid or Unknown BIN Provided ❌</b>"
+        if "Binary database not found or empty" in str(e):
+            error_message = "<b>Binary database not found or corrupted. Please contact support ❌</b>"
         await Smart_Notify(bot, "extp", e, message)
+        await send_message(
+            chat_id=message.chat.id,
+            text=error_message,
+            parse_mode=ParseMode.HTML
+        )
         return None
 
 def luhn_algorithm(number):
@@ -65,15 +75,20 @@ def generate_extrapolated_numbers(bin, amount=5):
             extrapolated_numbers.add(final_number)
     return list(extrapolated_numbers)
 
-def get_flag(country_code: str):
+def get_flag(country_code):
     try:
+        if not country_code or len(country_code) < 2:
+            return "Unknown", ""
+        country_code = country_code.upper()
+        if country_code in ['US1', 'US2']:
+            country_code = 'US'
         country = pycountry.countries.get(alpha_2=country_code)
         if not country:
-            raise ValueError("Invalid country code")
+            return "Unknown", ""
         country_name = country.name
         flag_emoji = chr(0x1F1E6 + ord(country_code[0]) - ord('A')) + chr(0x1F1E6 + ord(country_code[1]) - ord('A'))
         return country_name, flag_emoji
-    except:
+    except Exception:
         return "Unknown", ""
 
 class ExtrapolateCallbackFilter(BaseFilter):
