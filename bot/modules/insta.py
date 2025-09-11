@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import os
 import re
 import time
@@ -114,9 +111,9 @@ class InstagramDownloader:
                     thumbnail_paths = []
                     
                     for index, media in enumerate(data["results"]):
-                        media_type = media["type"]
+                        media_type = "video" if media["label"].startswith("video") else "image"
                         filename = self.temp_dir / await self.sanitize_filename(url.split('/')[-2], index, media_type)
-                        tasks.append(self.download_file(session, media["downloadLink"], filename))
+                        tasks.append(self.download_file(session, media["download"], filename))
                         
                         thumbnail_url = media.get("thumbnail")
                         if thumbnail_url:
@@ -132,7 +129,7 @@ class InstagramDownloader:
                     
                     for index, (result, thumbnail_result, thumbnail_path) in enumerate(zip(downloaded_files, thumbnail_tasks, thumbnail_paths)):
                         if isinstance(result, Exception):
-                            LOGGER.error(f"Failed to download media {index} for URL {data['results'][index]['downloadLink']}: {result}")
+                            LOGGER.error(f"Failed to download media {index} for URL {data['results'][index]['download']}: {result}")
                             if thumbnail_path and os.path.exists(thumbnail_path):
                                 clean_download(thumbnail_path)
                                 LOGGER.info(f"Deleted orphaned thumbnail: {thumbnail_path}")
@@ -144,7 +141,7 @@ class InstagramDownloader:
                         
                         media_files.append({
                             "filename": str(result),
-                            "type": data["results"][index]["type"],
+                            "type": "video" if data["results"][index]["label"].startswith("video") else "image",
                             "thumbnail": thumbnail_filename
                         })
                     
@@ -156,7 +153,7 @@ class InstagramDownloader:
                         "title": await self.sanitize_caption("Instagram Content"),
                         "media_files": media_files,
                         "webpage_url": url,
-                        "type": "carousel" if len(data["results"]) > 1 else data["results"][0]["type"]
+                        "type": "carousel" if data.get("media_count", 1) > 1 else ("video" if data["results"][0]["label"].startswith("video") else "image")
                     }
         
         except Exception as e:
