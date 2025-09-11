@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-# SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-# Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import re
 import os
 import random
@@ -244,6 +241,7 @@ class BinPatternFilter(BaseFilter):
 async def generate_handler(message: Message, bot: Bot):
     LOGGER.info(f"Received command: '{message.text}' from user {message.from_user.id if message.from_user else 'Unknown'} in chat {message.chat.id}")
     progress_message = None
+    file_name = None
     try:
         user_id = message.from_user.id if message.from_user else None
         user_full_name = "Anonymous"
@@ -356,7 +354,8 @@ async def generate_handler(message: Message, bot: Bot):
                     parse_mode=ParseMode.HTML
                 )
             finally:
-                clean_download()
+                if file_name:
+                    clean_download(file_name)
     except Exception as e:
         LOGGER.error(f"Error in generate_handler for chat {message.chat.id}: {str(e)}")
         await Smart_Notify(bot, "/gen", e, message)
@@ -383,6 +382,8 @@ async def generate_handler(message: Message, bot: Bot):
                 parse_mode=ParseMode.HTML
             )
             LOGGER.info(f"Sent error message to chat {message.chat.id}")
+        if file_name:
+            clean_download(file_name)
 
 @dp.message(BinPatternFilter())
 @new_task
@@ -390,6 +391,7 @@ async def generate_handler(message: Message, bot: Bot):
 async def auto_generate_handler(message: Message, bot: Bot):
     LOGGER.info(f"Received auto-generate command from user {message.from_user.id if message.from_user else 'Unknown'} in chat {message.chat.id}")
     progress_message = None
+    file_name = None
     try:
         user_id = message.from_user.id if message.from_user else None
         user_full_name = "Anonymous"
@@ -492,7 +494,8 @@ async def auto_generate_handler(message: Message, bot: Bot):
                     parse_mode=ParseMode.HTML
                 )
             finally:
-                clean_download()
+                if file_name:
+                    clean_download(file_name)
     except Exception as e:
         LOGGER.error(f"Error in auto_generate_handler for chat {message.chat.id}: {str(e)}")
         await Smart_Notify(bot, "/gen", e, message)
@@ -519,12 +522,15 @@ async def auto_generate_handler(message: Message, bot: Bot):
                 parse_mode=ParseMode.HTML
             )
             LOGGER.info(f"Sent error message to chat {message.chat.id}")
+        if file_name:
+            clean_download(file_name)
 
 @dp.callback_query(lambda c: c.data.startswith("regenerate|"))
 @new_task
 @SmartDefender
 async def regenerate_callback(callback_query: CallbackQuery, bot: Bot):
     LOGGER.info(f"Received callback query: '{callback_query.data}' from user {callback_query.from_user.id if callback_query.from_user else 'Unknown'} in chat {callback_query.message.chat.id}")
+    file_name = None
     try:
         user_id = callback_query.from_user.id if callback_query.from_user else None
         user_full_name = "Anonymous"
@@ -618,7 +624,8 @@ async def regenerate_callback(callback_query: CallbackQuery, bot: Bot):
                     parse_mode=ParseMode.HTML
                 )
             finally:
-                clean_download()
+                if file_name:
+                    clean_download(file_name)
     except Exception as e:
         LOGGER.error(f"Error in regenerate_callback for chat {callback_query.message.chat.id}: {str(e)}")
         await Smart_Notify(bot, "regenerate_callback", e, callback_query.message)
@@ -628,3 +635,5 @@ async def regenerate_callback(callback_query: CallbackQuery, bot: Bot):
             parse_mode=ParseMode.HTML
         )
         LOGGER.info(f"Sent error message to chat {callback_query.message.chat.id}")
+        if file_name:
+            clean_download(file_name)
