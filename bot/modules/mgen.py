@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 from aiogram import Bot
 from aiogram.filters import Command
 from aiogram.types import Message, FSInputFile
@@ -95,6 +92,7 @@ def generate_custom_cards(bin, amount, month=None, year=None, cvv=None):
 async def multigen_handler(message: Message, bot: Bot):
     LOGGER.info(f"Received /mgen command from user: {message.from_user.id if message.from_user else 'Unknown'} in chat {message.chat.id}")
     progress_message = None
+    file_name = None
     try:
         args = get_args(message)
         if len(args) < 2:
@@ -150,7 +148,8 @@ async def multigen_handler(message: Message, bot: Bot):
                 total_cards.extend(generate_custom_cards(bin, amount, None, None, None))
 
         valid_cards = [card for card in total_cards if luhn_algorithm(card.split('|')[0])]
-        file_name = f"Generated_CC_{message.chat.id}.txt"
+        os.makedirs('./downloads', exist_ok=True)
+        file_name = f"./downloads/Generated_CC_{message.chat.id}.txt"
 
         with open(file_name, "w") as file:
             file.write("\n".join(valid_cards))
@@ -213,4 +212,5 @@ async def multigen_handler(message: Message, bot: Bot):
             )
             LOGGER.info(f"Sent CC generation error message to chat {message.chat.id}")
     finally:
-        clean_download()
+        if file_name:
+            clean_download(file_name)
