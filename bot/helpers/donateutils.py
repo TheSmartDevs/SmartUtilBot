@@ -44,7 +44,7 @@ PAYMENT_SUCCESS_TEXT = """
 🎉 Huge thanks <b>{0}</b> for donating <b>{1}</b> ⭐️ to support <b>Smart Util!</b>
 Your contribution helps keep everything running smooth and awesome 🚀
 
-<b>🧾 Transaction ID:</b> `{2}`
+<b>🧾 Transaction ID:</b> <code>{2}</code>
 """
 
 ADMIN_NOTIFICATION_TEXT = """
@@ -52,9 +52,9 @@ ADMIN_NOTIFICATION_TEXT = """
 <b>━━━━━━━━━━━━━━━</b>
 <b>From: </b> {0}
 <b>Username:</b> {2}
-<b>UserID:</b>`{1}`
+<b>UserID:</b> <code>{1}</code>
 <b>Amount:</b> {3} ⭐️
-<b>Transaction ID:</b> `{4}`
+<b>Transaction ID:</b> <code>{4}</code>
 <b>━━━━━━━━━━━━━━━</b>
 <b>Click Below Button If Need Refund 💸</b>
 """
@@ -65,7 +65,7 @@ DUPLICATE_INVOICE_TEXT = "<b>🚫 Wait Bro! Contribution Already in Progress!</b
 INVALID_INPUT_TEXT = "<b>❌ Sorry Bro! Invalid Input! Use a positive number.</b>"
 INVOICE_FAILED_TEXT = "<b>❌ Invoice Creation Failed, Bruh! Try Again!</b>"
 PAYMENT_FAILED_TEXT = "<b>❌ Sorry Bro! Payment Declined! Contact Support!</b>"
-REFUND_SUCCESS_TEXT = "<b>✅ Refund Successfully Completed Bro!</b>\n\n<b>{0} Stars</b> have been refunded to <b>[{1}](tg://user?id={2})</b>"
+REFUND_SUCCESS_TEXT = "<b>✅ Refund Successfully Completed Bro!</b>\n\n<b>{0} Stars</b> have been refunded to <b><a href='tg://user?id={2}'>{1}</a></b>"
 REFUND_FAILED_TEXT = "<b>❌ Refund Failed!</b>\n\nFailed to refund <b>{0} Stars</b> to <b>{1}</b> (ID: `{2}`)\nError: {3}"
 
 active_invoices = {}
