@@ -66,7 +66,7 @@ INVALID_INPUT_TEXT = "<b>❌ Sorry Bro! Invalid Input! Use a positive number.</b
 INVOICE_FAILED_TEXT = "<b>❌ Invoice Creation Failed, Bruh! Try Again!</b>"
 PAYMENT_FAILED_TEXT = "<b>❌ Sorry Bro! Payment Declined! Contact Support!</b>"
 REFUND_SUCCESS_TEXT = "<b>✅ Refund Successfully Completed Bro!</b>\n\n<b>{0} Stars</b> have been refunded to <b><a href='tg://user?id={2}'>{1}</a></b>"
-REFUND_FAILED_TEXT = "<b>❌ Refund Failed!</b>\n\nFailed to refund <b>{0} Stars</b> to <b>{1}</b> (ID: `{2}`)\nError: {3}"
+REFUND_FAILED_TEXT = "<b>❌ Refund Failed!</b>\n\nFailed to refund <b>{0} Stars</b> to <b>{1}</b> (ID: <code>{2}</code>)\nError: {3}"
 
 active_invoices = {}
 
@@ -322,3 +322,4 @@ async def process_successful_payment(message: Message, bot: Bot):
             parse_mode=ParseMode.HTML,
             reply_markup=support_markup
         )
+
