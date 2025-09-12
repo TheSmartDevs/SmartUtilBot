@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import aiohttp
 from aiogram import Bot
 from aiogram.filters import Command
@@ -14,6 +11,7 @@ from bot.helpers.logger import LOGGER
 from bot.helpers.commands import BotCommands
 from bot.helpers.defend import SmartDefender
 from config import A360APIBASEURL
+import pycountry
 
 logger = LOGGER
 
@@ -39,19 +37,46 @@ async def get_stripe_key_info(stripe_key: str) -> str:
                 if response.status != 200 or not (data := await response.json()).get("success"):
                     return "SK KEY REVOKED ❌"
                 data = data.get("data", {})
-        available_balance = data.get("available_balance", 0) / 100 if data.get("available_balance") else 0
-        currency = data.get("currency", "N/A").upper()
+                account_info = data.get("account_info", {})
+                balance = data.get("balance", {})
+                capabilities = data.get("capabilities", {})
+        
+        country_code = account_info.get('country', 'N/A').upper()
+        country_mappings = {'UK': 'GB', 'GB': 'GB', 'UAE': 'AE', 'AE': 'AE'}
+        normalized_country_code = country_mappings.get(country_code, country_code)
+        
+        try:
+            country = pycountry.countries.get(alpha_2=normalized_country_code)
+            country_name = country.name if country else normalized_country_code
+            country_flag = country.flag if country else ''
+        except Exception:
+            country_name = normalized_country_code
+            country_flag = ''
+        
+        country_payment_key = next((key for key in capabilities if '_intl_payments' in key), None)
+        country_payment_status = capabilities.get(country_payment_key, 'N/A') if country_payment_key else 'N/A'
+        
         details = (
             f"<b>み SK Key Authentication ↝ Successful ✅</b>\n"
             f"<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
-            f"<b>⊗ SK Key Status ↝</b> {'Live ✅' if data.get('charges_enabled') else 'Restricted ❌'}\n"
-            f"<b>⊗ Account ID ↝</b> <code>{data.get('id', 'N/A')}</code>\n"
-            f"<b>⊗ Email ↝</b> <code>{data.get('email', 'N/A')}</code>\n"
-            f"<b>⊗ Business Name ↝</b> <code>{data.get('business_name', 'N/A')}</code>\n"
-            f"<b>⊗ Charges Enabled ↝</b> {'Yes ✅' if data.get('charges_enabled') else 'No ❌'}\n"
-            f"<b>⊗ Payouts Enabled ↝</b> {'Yes ✅' if data.get('payouts_enabled') else 'No ❌'}\n"
-            f"<b>⊗ Account Type ↝</b> <code>{data.get('type', 'N/A').capitalize()}</code>\n"
-            f"<b>⊗ Balance ↝</b> <code>{available_balance} {currency}</code>\n"
+            f"<b>⊗ Secret Key ↝</b> <code>{stripe_key}</code>\n"
+            f"<b>⊗ Public Key ↝</b> <code>{account_info.get('pk_live', 'N/A')}</code>\n"
+            f"<b>⊗ SK Key Status ↝</b> {account_info.get('status', 'N/A')}\n"
+            f"<b>⊗ Account ID ↝</b> <code>{account_info.get('account_id', 'N/A')}</code>\n"
+            f"<b>⊗ Email ↝</b> <code>{account_info.get('email', 'N/A')}</code>\n"
+            f"<b>⊗ Business Name ↝</b> <code>{account_info.get('business_name', 'N/A')}</code>\n"
+            f"<b>⊗ Phone ↝</b> <code>{account_info.get('phone', 'N/A')}</code>\n"
+            f"<b>⊗ Website ↝</b> <code>{account_info.get('website', 'N/A')}</code>\n"
+            f"<b>⊗ Country ↝</b> {country_flag} <code>{country_name}</code>\n"
+            f"<b>⊗ Charges Enabled ↝</b> {account_info.get('charges_enabled', 'N/A')}\n"
+            f"<b>⊗ Payouts Enabled ↝</b> {account_info.get('payouts_enabled', 'N/A')}\n"
+            f"<b>⊗ Account Type ↝</b> <code>{account_info.get('account_type', 'N/A')}</code>\n"
+            f"<b>⊗ Card Payments ↝</b> {capabilities.get('card_payments', 'N/A')}\n"
+            f"<b>⊗ {country_name} Intl Payments ↝</b> {country_payment_status}\n"
+            f"<b>⊗ Transfers ↝</b> {capabilities.get('transfers', 'N/A')}\n"
+            f"<b>⊗ Available Balance ↝</b> <code>{balance.get('available', 'N/A')}</code>\n"
+            f"<b>⊗ Pending Balance ↝</b> <code>{balance.get('pending', 'N/A')}</code>\n"
+            f"<b>⊗ Live Mode ↝</b> {balance.get('live_mode', 'N/A')}\n"
             f"<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
             f"<b>⌁ Thank You For Using Smart Tool ↯</b>"
         )
@@ -89,7 +114,7 @@ async def stripe_key_handler(message: Message, bot: Bot):
         text="<b>Processing Your Request...✨</b>",
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
-        )
+    )
     try:
         result = await verify_stripe_key(stripe_key)
         user_full_name = f"{message.from_user.first_name} {message.from_user.last_name or ''}".strip()
@@ -101,16 +126,9 @@ async def stripe_key_handler(message: Message, bot: Bot):
                 f"<b>⊗ Checked By ➺</b> {user_link}"
             )
         else:
-            data = result["data"]
-            available_balance = data.get("available_balance", 0) / 100 if data.get("available_balance") else 0
-            pending_balance = data.get("pending_balance", 0) / 100 if data.get("pending_balance") else 0
-            currency = data.get("currency", "N/A").upper()
             response_text = (
                 f"<b>⊗ SK ➺</b> <code>{stripe_key}</code>\n"
                 f"<b>⊗ Response: LIVE KEY ✅</b>\n"
-                f"<b>⊗ Currency:</b> <code>{currency}</code>\n"
-                f"<b>⊗ Available Balance:</b> <code>{available_balance}$</code>\n"
-                f"<b>⊗ Pending Balance:</b> <code>{pending_balance}$</code>\n"
                 f"<b>⊗ Checked By ➺</b> {user_link}"
             )
         try:
