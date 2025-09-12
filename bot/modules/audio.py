@@ -18,8 +18,6 @@ from bot.helpers.commands import BotCommands
 from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.defend import SmartDefender
-from bot.helpers.security import SmartShield
-from bot.helpers.pgbar import progress_bar
 
 DOWNLOAD_DIRECTORY = "./downloads/"
 
@@ -43,7 +41,12 @@ def convert_video_to_audio(video_file_path, audio_file_path):
 @SmartDefender
 async def aud_handler(message: Message, bot: Bot):
     LOGGER.info(f"Received /aud or /convert command from user: {message.from_user.id if message.from_user else 'Unknown'} in chat {message.chat.id}")
+    
+    # Initialize all variables before try block
     progress_message = None
+    video_file_path = None
+    audio_file_path = None
+    
     try:
         if not message.reply_to_message or not message.reply_to_message.video:
             progress_message = await send_message(
@@ -98,18 +101,18 @@ async def aud_handler(message: Message, bot: Bot):
             chat_id=message.chat.id,
             audio=audio_file_path,
             caption=f"<code>{audio_file_name}</code>",
-            parse_mode=SmartParseMode.HTML,
-            progress=progress_bar,
-            progress_args=(progress_message, start_time, last_update_time)
+            parse_mode=SmartParseMode.HTML
         )
         LOGGER.info("Audio file uploaded successfully")
 
         await delete_messages(message.chat.id, progress_message.message_id)
+        LOGGER.info(f"Successfully processed /aud command for user {message.from_user.id} in chat {message.chat.id}")
 
     except Exception as e:
         LOGGER.error(f"Error processing /aud or /convert command in chat {message.chat.id}: {str(e)}")
         await Smart_Notify(bot, "aud/convert", e, message)
         error_text = "<b>❌ Sorry Bro Converter API Error</b>"
+        
         if progress_message:
             try:
                 await progress_message.edit_text(
@@ -125,12 +128,23 @@ async def aud_handler(message: Message, bot: Bot):
                     text=error_text,
                     parse_mode=ParseMode.HTML
                 )
+                LOGGER.info(f"Sent error message to chat {message.chat.id}")
         else:
             await send_message(
                 chat_id=message.chat.id,
                 text=error_text,
                 parse_mode=ParseMode.HTML
             )
-        LOGGER.info(f"Sent error message to chat {message.chat.id}")
+            LOGGER.info(f"Sent error message to chat {message.chat.id}")
     finally:
-        clean_download(video_file_path, audio_file_path)
+        
+        if video_file_path and os.path.exists(video_file_path):
+            try:
+                os.remove(video_file_path)
+            except:
+                pass
+        if audio_file_path and os.path.exists(audio_file_path):
+            try:
+                os.remove(audio_file_path)
+            except:
+                pass
