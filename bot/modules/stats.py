@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import asyncio
 from datetime import datetime, timedelta
 from aiogram import Bot
@@ -10,6 +7,7 @@ from aiogram.types import Message, ChatMemberUpdated
 from pyrogram import Client
 from pyrogram.enums import ParseMode as SmartParseMode, ChatType as PyrogramChatType
 from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated, ChatWriteForbidden, PeerIdInvalid
+from pyrogram.types import InlineKeyboardMarkup as PyrogramInlineKeyboardMarkup, InlineKeyboardButton as PyrogramInlineKeyboardButton
 from bot import dp, SmartPyro
 from bot.helpers.botutils import send_message, get_args
 from bot.helpers.commands import BotCommands
@@ -105,7 +103,9 @@ async def process_broadcast(client: Client, content: Message, is_broadcast: bool
         start_time = datetime.now()
         buttons = SmartButtons()
         buttons.button(text="Updates Channel", url=UPDATE_CHANNEL_URL)
-        keyboard = buttons.build_menu(b_cols=1)
+        aiogram_keyboard = buttons.build_menu(b_cols=1)
+        pyrogram_buttons = [[PyrogramInlineKeyboardButton(text=btn.text, url=btn.url)] for row in aiogram_keyboard.inline_keyboard for btn in row if btn.url]
+        keyboard = PyrogramInlineKeyboardMarkup(pyrogram_buttons) if pyrogram_buttons else None
         all_chat_ids = user_ids + group_ids
         LOGGER.debug(f"Starting broadcast to {len(all_chat_ids)} chats")
         async def send_to_chat(target_chat_id: int):
@@ -127,7 +127,7 @@ async def process_broadcast(client: Client, content: Message, is_broadcast: bool
                     sent_msg = await client.copy_message(
                         target_chat_id,
                         content.chat.id,
-                        content.id,
+                        content.message_id,
                         reply_markup=keyboard
                     )
                     if target_chat_id in group_ids:
@@ -138,7 +138,7 @@ async def process_broadcast(client: Client, content: Message, is_broadcast: bool
                     await client.forward_messages(
                         target_chat_id,
                         content.chat.id,
-                        content.id
+                        content.message_id
                     )
                 return ("user" if target_chat_id in user_ids else "group", "success")
             except FloodWait as e:
