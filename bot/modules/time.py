@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import pytz
 import pycountry
 from datetime import datetime
@@ -126,7 +123,7 @@ async def get_calendar_markup(year, month, country_code):
             if day == 0:
                 buttons.button(text=" ", callback_data=f"alert_{country_code}_{year}_{month}")
             else:
-                buttons.button(text=str(day), callback_data=f"day_{country_code}_{month:02d}_{day:02d}")
+                buttons.button(text=str(day), callback_data=f"alert_{country_code}_{year}_{month}")
     country = pycountry.countries.get(alpha_2=country_code)
     country_name = country.name if country else "Unknown"
     flag_emoji = get_flag(country_code)[1]
@@ -237,7 +234,6 @@ async def handle_time_command(message: Message, bot: Bot):
         clean_download(*temp_files)
 
 @dp.callback_query(lambda c: c.data.startswith('nav_'))
-@SmartDefender
 async def handle_calendar_nav(callback_query):
     try:
         _, country_code, year, month = callback_query.data.split('_')
@@ -274,18 +270,9 @@ async def handle_calendar_nav(callback_query):
         await callback_query.answer("Sorry Invalid Button Query", show_alert=True)
 
 @dp.callback_query(lambda c: c.data.startswith('alert_'))
-@SmartDefender
 async def handle_alert(callback_query):
-    await callback_query.answer("This Is The Button For Calendar", show_alert=True)
+    await callback_query.answer("This Button Is A Part Of Calender", show_alert=True)
 
 @dp.callback_query(lambda c: c.data.startswith('day_'))
-@SmartDefender
 async def handle_day_click(callback_query):
-    try:
-        _, country_code, month, day = callback_query.data.split('_')
-        month = int(month)
-        day = int(day)
-        await callback_query.answer(f"{day} {calendar.month_name[month]} - No holiday", show_alert=True)
-    except Exception as e:
-        LOGGER.error(f"Exception in handle_day_click: {str(e)}")
-        await callback_query.answer("Sorry Invalid Button Query", show_alert=True)
+    await callback_query.answer("This Button Is A Part Of Calender", show_alert=True)
