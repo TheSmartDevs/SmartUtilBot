@@ -44,36 +44,39 @@ async def get_bin_info(bin: str, bot: Bot, message: Message):
         )
         return None
 
-def luhn_algorithm(number):
-    def digits_of(n):
-        return [int(d) for d in str(n)]
-    digits = digits_of(number)
+def calculate_luhn_check_digit(partial_card_number):
+    digits = [int(d) for d in str(partial_card_number) if d.isdigit()]
+    if not digits:
+        return 0
     checksum = 0
-    odd_digits = digits[-1::-2]
-    even_digits = digits[-2::-2]
-    checksum += sum(odd_digits)
-    for d in even_digits:
-        checksum += sum(digits_of(d * 2))
-    return checksum % 10 == 0
+    for i, digit in enumerate(reversed(digits)):
+        if i % 2 == 0:
+            doubled = digit * 2
+            if doubled > 9:
+                doubled = doubled // 10 + doubled % 10
+            checksum += doubled
+        else:
+            checksum += digit
+    check_digit = (10 - (checksum % 10)) % 10
+    return check_digit
 
 def generate_extrapolated_numbers(bin, amount=5):
-    extrapolated_numbers = set()
-    while len(extrapolated_numbers) < amount:
-        number = bin + ''.join(random.choices('0123456789', k=9))
-        check_sum = 0
-        reverse_digits = number[::-1]
-        for i, digit in enumerate(reverse_digits):
-            n = int(digit)
-            if i % 2 == 0:
-                n = n * 2
-                if n > 9:
-                    n = n - 9
-            check_sum += n
-        last_digit = (10 - (check_sum % 10)) % 10
-        final_number = number + str(last_digit)
-        if luhn_algorithm(final_number):
-            extrapolated_numbers.add(final_number)
-    return list(extrapolated_numbers)
+    cards = []
+    bin = str(bin)
+    if len(bin) >= 16:
+        LOGGER.error(f"BIN too long: {len(bin)} digits for target length 16")
+        return []
+    for _ in range(amount):
+        card_body = bin
+        remaining_digits = 16 - len(card_body) - 1
+        if remaining_digits < 0:
+            LOGGER.error(f"Invalid BIN length: {len(card_body)}")
+            continue
+        card_body += ''.join(str(random.randint(0, 9)) for _ in range(remaining_digits))
+        check_digit = calculate_luhn_check_digit(card_body)
+        card_number = card_body + str(check_digit)
+        cards.append(card_number)
+    return cards
 
 def get_flag(country_code):
     try:
@@ -189,7 +192,6 @@ async def extrapolate_handler(message: Message, bot: Bot):
 
 @dp.callback_query(ExtrapolateCallbackFilter())
 @new_task
-@SmartDefender
 async def regenerate_callback(callback_query: CallbackQuery, bot: Bot):
     LOGGER.info(f"Received regenerate callback from user: {callback_query.from_user.id} in chat {callback_query.message.chat.id}")
     try:
