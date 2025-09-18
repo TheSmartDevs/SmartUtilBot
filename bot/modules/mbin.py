@@ -1,6 +1,6 @@
 # Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
+# SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
+# Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 from aiogram import Bot
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -20,9 +20,10 @@ import pycountry
 import os
 import asyncio
 
+smartdb = SmartBinDB()
+
 async def get_bin_info(bin: str, bot: Bot, message: Message):
     try:
-        smartdb = SmartBinDB()
         result = await smartdb.get_bin_info(bin)
         if result.get("status") == "SUCCESS" and result.get("data") and isinstance(result["data"], list) and len(result["data"]) > 0:
             return result
@@ -37,9 +38,14 @@ async def get_bin_info(bin: str, bot: Bot, message: Message):
 
 def get_flag(country_code: str):
     try:
+        if not country_code or len(country_code) < 2:
+            return "Unknown", ""
+        country_code = country_code.upper()
+        if country_code in ['US1', 'US2']:
+            country_code = 'US'
         country = pycountry.countries.get(alpha_2=country_code)
         if not country:
-            raise ValueError("Invalid country code")
+            return "Unknown", ""
         country_name = country.name
         flag_emoji = chr(0x1F1E6 + ord(country_code[0]) - ord('A')) + chr(0x1F1E6 + ord(country_code[1]) - ord('A'))
         return country_name, flag_emoji
@@ -55,8 +61,9 @@ async def bin_handler(message: Message, bot: Bot):
     try:
         bins = []
         if message.reply_to_message and message.reply_to_message.document:
-            file = await message.reply_to_message.download(destination_file=f"bin_{message.chat.id}.txt")
-            with open(file, 'r') as f:
+            file_path = f"bin_{message.chat.id}.txt"
+            await bot.download(message.reply_to_message.document, destination=file_path)
+            with open(file_path, 'r') as f:
                 bins = [line.strip()[:6] for line in f.readlines() if line.strip() and len(line.strip()) >= 6 and line.strip()[:6].isdigit()]
             clean_download()
             LOGGER.info(f"BINs extracted from uploaded file by user: {message.from_user.id}")
