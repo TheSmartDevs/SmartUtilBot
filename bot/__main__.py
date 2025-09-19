@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import asyncio
 import logging
 import os
@@ -12,6 +9,22 @@ from importlib import import_module
 
 async def main():
     try:
+        modules_path = "bot.modules"
+        modules_dir = os.path.join(os.path.dirname(__file__), "modules")
+        for filename in os.listdir(modules_dir):
+            if filename.endswith(".py") and filename != "__init__.py":
+                module_name = filename[:-3]
+                try:
+                    import_module(f"{modules_path}.{module_name}")
+                except Exception as e:
+                    LOGGER.error(f"Failed to load module {module_name}: {e}")
+
+        dp.callback_query.register(handle_callback_query)
+
+        await SmartPyro.start()
+        await SmartUserBot.start()
+        LOGGER.info("Bot Successfully Started 💥")
+
         restart_data = await SmartReboot.find_one()
         if restart_data:
             try:
@@ -26,21 +39,12 @@ async def main():
             except Exception as e:
                 LOGGER.error(f"Failed to update restart message: {e}")
 
-        modules_path = "bot.modules"
-        modules_dir = os.path.join(os.path.dirname(__file__), "modules")
-        for filename in os.listdir(modules_dir):
-            if filename.endswith(".py") and filename != "__init__.py":
-                module_name = filename[:-3]
-                import_module(f"{modules_path}.{module_name}")
-
-        dp.callback_query.register(handle_callback_query)
-
-        await SmartPyro.start()
-        await SmartUserBot.start()
-        LOGGER.info("Bot Successfully Started 💥")
         await dp.start_polling(SmartAIO, drop_pending_updates=True)
     except asyncio.CancelledError:
         LOGGER.info("Polling cancelled, shutting down...")
+        raise
+    except Exception as e:
+        LOGGER.error(f"Main loop failed: {e}")
         raise
 
 if __name__ == "__main__":
