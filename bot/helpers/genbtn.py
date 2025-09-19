@@ -549,19 +549,19 @@ responses = {
         {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
     ),
     "about_me": (
-        "**Name:** Smart Tool\n"
-        "**Version:** v28.0 (Beta) 🛠\n\n"
-        "**Development Team:**\n"
-        "- **Creator:** [Abir Arafat Chawdhury 👨‍💻](https://t.me/ISmartCoder)\n"
-        "- **Contributor:** [Nyein Ko Ko Aung 🤝](https://t.me/nkka404)\n"
-        "- **Helper:** [Rahat Hossain 👥](https://t.me/NeoFrd)\n"
-        "**Technical Stacks:**\n"
-        "- **Language:** Python 🐍\n"
-        "- **Libraries:** Aiogram, Pyrofork & Telethon 📚\n"
-        "- **Database:** MongoDB Database 🗄\n"
-        "- **Hosting:** Digital Ocean VPS 🌐\n\n"
-        "**About:** The all-in-one Telegram toolkit for seamless education, AI, downloads, and more!\n\n",
-        {'parse_mode': ParseMode.MARKDOWN, 'disable_web_page_preview': True}
+        "<b>Name:</b> Smart Util\n"
+        "<b>Version:</b> v28.0 (Beta) 🛠\n\n"
+        "<b>Development Team:</b>\n"
+        "- <b>Creator:</b> <a href='https://t.me/ISmartCoder'>Abir Arafat Chawdhury 👨‍💻</a>\n"
+        "- <b>Contributor:</b> <a href='https://t.me/nkka404'>Nyein Ko Ko Aung 🤝</a>\n"
+        "- <b>Helper:</b> <a href='https://t.me/NeoFrd'>Rahat Hossain 👥</a>\n"
+        "<b>Technical Stacks:</b>\n"
+        "- <b>Language:</b> Python 🐍\n"
+        "- <b>Libraries:</b> Aiogram, Pyrofork & Telethon 📚\n"
+        "- <b>Database:</b> MongoDB Database 🗄\n"
+        "- <b>Hosting:</b> Digital Ocean VPS 🌐\n\n"
+        "<b>About:</b> The all-in-one Telegram toolkit for seamless education, AI, downloads, and more!\n\n",
+        {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
     ),
     "text_split": (
         "<b>📂 Text Split Utils ⚙️ </b>\n"
