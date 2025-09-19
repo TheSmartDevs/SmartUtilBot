@@ -31,45 +31,42 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
         total_users = await SmartUsers.count_documents({"is_group": False})
         total_groups = await SmartUsers.count_documents({"is_group": True})
         stats_text = (
-            f"**Smart Bot Status ⇾ Report ✅**\n"
-            f"**━━━━━━━━━━━━━━━━**\n"
-            f"**Users & Groups Engagements:**\n"
-            f"**1 Day:** {daily_users} users were active\n"
-            f"**1 Week:** {weekly_users} users were active\n"
-            f"**1 Month:** {monthly_users} users were active\n"
-            f"**1 Year:** {yearly_users} users were active\n"
-            f"**Total Connected Groups:** {total_groups}\n"
-            f"**━━━━━━━━━━━━━━━━**\n"
-            f"**Total Smart Util Users:** {total_users} ✅"
+            f"<b>Smart Bot Status ⇾ Report ✅</b>\n"
+            f"<b>━━━━━━━━━━━━━━━━</b>\n"
+            f"<b>Users & Groups Engagements:</b>\n"
+            f"<b>1 Day:</b> {daily_users} users were active\n"
+            f"<b>1 Week:</b> {weekly_users} users were active\n"
+            f"<b>1 Month:</b> {monthly_users} users were active\n"
+            f"<b>1 Year:</b> {yearly_users} users were active\n"
+            f"<b>Total Connected Groups:</b> {total_groups}\n"
+            f"<b>━━━━━━━━━━━━━━━━</b>\n"
+            f"<b>Total Smart Util Users:</b> {total_users} ✅"
         )
         back_button = SmartButtons()
         back_button.button(text="⬅️ Back", callback_data="fstats")
         back_button = back_button.build_menu(b_cols=1, h_cols=1, f_cols=1)
-        await call.message.edit_text(stats_text, parse_mode=ParseMode.MARKDOWN, reply_markup=back_button)
+        await call.message.edit_text(stats_text, parse_mode=ParseMode.HTML, reply_markup=back_button)
         return
 
     if call.data == "fstats":
         stats_dashboard_text = (
-            """**🗒 Smart Tool Basic Statistics Menu 🔍**  
-**━━━━━━━━━━━━━━━━━**  
-Stay Updated With Real Time Insights....⚡️  
-
-⊗ **Full Statistics:** Get Full Statistics Of Smart Tool ⚙️  
-⊗ **Top Users:** Get Top User's Leaderboard 🔥  
-⊗ **Growth Trends:** Get Knowledge About Growth 👁  
-⊗ **Activity Times:** See Which User Is Most Active ⏰  
-⊗ **Milestones:** Track Special Achievements 🏅  
-
-**━━━━━━━━━━━━━━━━━**  
-**💡 Select an option and take control:**  
-"""
+            f"<b>🗒 Smart Util Basic Statistics Menu 🔍</b>\n"  
+            f"<b>━━━━━━━━━━━━━━━━━</b>\n"  
+            f"Stay Updated With Real Time Insights....⚡️\n\n"  
+            f"⊗ <b>Full Statistics:</b> Get Full Statistics Of Smart Tool ⚙️\n"  
+            f"⊗ <b>Top Users:</b> Get Top User's Leaderboard 🔥\n"  
+            f"⊗ <b>Growth Trends:</b> Get Knowledge About Growth 👁\n"  
+            f"⊗ <b>Activity Times:</b> See Which User Is Most Active ⏰\n"  
+            f"⊗ <b>Milestones:</b> Track Special Achievements 🏅\n\n"  
+            f"<b>━━━━━━━━━━━━━━━━━</b>\n"  
+            f"<b>💡 Select an option and take control:</b>\n"
         )
         stats_dashboard_buttons = SmartButtons()
         stats_dashboard_buttons.button(text="📈 Usage Report", callback_data="stats")
         stats_dashboard_buttons.button(text="🏆 Top Users", callback_data="top_users_1")
         stats_dashboard_buttons.button(text="⬅️ Back", callback_data="about_me")
         stats_dashboard_buttons = stats_dashboard_buttons.build_menu(b_cols=2, h_cols=1, f_cols=1)
-        await call.message.edit_text(stats_dashboard_text, parse_mode=ParseMode.MARKDOWN, reply_markup=stats_dashboard_buttons)
+        await call.message.edit_text(stats_dashboard_text, parse_mode=ParseMode.HTML, reply_markup=stats_dashboard_buttons)
         return
 
     if call.data.startswith("top_users_"):
@@ -84,8 +81,8 @@ Stay Updated With Real Time Insights....⚡️
         paginated_users = daily_users[start_index:end_index]
 
         top_users_text = (
-            f"**🏆 Top Users (All-time) — page {page}/{total_pages if total_pages > 0 else 1}:**\n"
-            f"**━━━━━━━━━━━━━━━**\n"
+            f"<b>🏆 Top Users (All-time) — page {page}/{total_pages if total_pages > 0 else 1}:</b>\n"
+            f"<b>━━━━━━━━━━━━━━━</b>\n"
         )
         for i, user in enumerate(paginated_users, start=start_index + 1):
             user_id = user['user_id']
@@ -96,7 +93,7 @@ Stay Updated With Real Time Insights....⚡️
                 LOGGER.error(f"Failed to fetch user {user_id}: {e}")
                 full_name = f"User_{user_id}"
             rank_emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else "🔸"
-            top_users_text += f"**{rank_emoji} {i}.** [{full_name}](tg://user?id={user_id})\n** - User Id :** `{user_id}`\n\n"
+            top_users_text += f"<b>{rank_emoji} {i}.</b> <a href=\"tg://user?id={user_id}\">{full_name}</a>\n<b> - User Id :</b> <code>{user_id}</code>\n\n"
 
         top_users_buttons = SmartButtons()
         if page == 1 and total_pages > 1:
@@ -110,7 +107,7 @@ Stay Updated With Real Time Insights....⚡️
         else:
             top_users_buttons.button(text="⬅️ Back", callback_data="fstats")
         top_users_buttons = top_users_buttons.build_menu(b_cols=2 if page != total_pages else 1, h_cols=1, f_cols=1)
-        await call.message.edit_text(top_users_text, parse_mode=ParseMode.MARKDOWN, reply_markup=top_users_buttons)
+        await call.message.edit_text(top_users_text, parse_mode=ParseMode.HTML, reply_markup=top_users_buttons)
         return
 
     if call.data == "server":
@@ -130,29 +127,29 @@ Stay Updated With Real Time Insights....⚡️
         used_mem = mem.used / (2**30)
         available_mem = mem.available / (2**30)
         server_status_text = (
-            f"**Smart Bot Status ⇾ Report ✅**\n"
-            f"**━━━━━━━━━━━━━**\n"
-            f"**Server Connection:**\n"
-            f"**- Ping:** {ping} ms\n"
-            f"**- Bot Status:** Online\n"
-            f"**- Server Uptime:** {uptime}\n"
-            f"**━━━━━━━━━━━━━**\n"
-            f"**Server Storage:**\n"
-            f"**- Total:** {total_disk:.2f} GB\n"
-            f"**- Used:** {used_disk:.2f} GB\n"
-            f"**- Available:** {free_disk:.2f} GB\n"
-            f"**━━━━━━━━━━━━━**\n"
-            f"**Memory Usage:**\n"
-            f"**- Total:** {total_mem:.2f} GB\n"
-            f"**- Used:** {used_mem:.2f} GB\n"
-            f"**- Available:** {available_mem:.2f} GB\n"
-            f"**━━━━━━━━━━━━━**\n"
-            f"**Server Stats Check Successful ✅**"
+            f"<b>Smart Bot Status ⇾ Report ✅</b>\n"
+            f"<b>━━━━━━━━━━━━━</b>\n"
+            f"<b>Server Connection:</b>\n"
+            f"<b>- Ping:</b> {ping} ms\n"
+            f"<b>- Bot Status:</b> Online\n"
+            f"<b>- Server Uptime:</b> {uptime}\n"
+            f"<b>━━━━━━━━━━━━━</b>\n"
+            f"<b>Server Storage:</b>\n"
+            f"<b>- Total:</b> {total_disk:.2f} GB\n"
+            f"<b>- Used:</b> {used_disk:.2f} GB\n"
+            f"<b>- Available:</b> {free_disk:.2f} GB\n"
+            f"<b>━━━━━━━━━━━━━</b>\n"
+            f"<b>Memory Usage:</b>\n"
+            f"<b>- Total:</b> {total_mem:.2f} GB\n"
+            f"<b>- Used:</b> {used_mem:.2f} GB\n"
+            f"<b>- Available:</b> {available_mem:.2f} GB\n"
+            f"<b>━━━━━━━━━━━━━</b>\n"
+            f"<b>Server Stats Check Successful ✅</b>"
         )
         back_button = SmartButtons()
         back_button.button(text="⬅️ Back", callback_data="about_me")
         back_button = back_button.build_menu(b_cols=1, h_cols=1, f_cols=1)
-        await call.message.edit_text(server_status_text, parse_mode=ParseMode.MARKDOWN, reply_markup=back_button)
+        await call.message.edit_text(server_status_text, parse_mode=ParseMode.HTML, reply_markup=back_button)
         return
 
     if call.data in responses:
@@ -199,12 +196,12 @@ Stay Updated With Real Time Insights....⚡️
         full_name = f"{call.from_user.first_name} {call.from_user.last_name}" if call.from_user.last_name else call.from_user.first_name
         start_message = (
             f"<b>Hi {full_name}! Welcome To This Bot</b>\n"
-            "<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
-            "<b>Smart Util</b> is your ultimate toolkit on Telegram, packed with AI tools, "
-            "educational resources, downloaders, temp mail, crypto utilities, and more. "
-            "Simplify your tasks with ease!\n"
-            "<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
-            f"<b>Don't forget to <a href='{UPDATE_CHANNEL_URL}'>join here</a> for updates!</b>"
+            f"<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
+            f"<b>Smart Util</b> is your ultimate toolkit on Telegram, packed with AI tools, "
+            f"educational resources, downloaders, temp mail, crypto utilities, and more. "
+            f"Simplify your tasks with ease!\n"
+            f"<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
+            f"<b>Don't forget to <a href=\"{UPDATE_CHANNEL_URL}\">join here</a> for updates!</b>"
         )
         start_buttons = SmartButtons()
         start_buttons.button(text="⚙️ Main Menu", callback_data="main_menu", position="header")
@@ -275,7 +272,7 @@ Stay Updated With Real Time Insights....⚡️
             f"<b>6. Termination</b>\n"
             f" - Access may be terminated for any violations without prior notice.\n\n"
             f"<b>7. Contact Information</b>\n"
-            f" - Contact My Dev for any inquiries or concerns. <a href='tg://user?id=7303810912'>Abir Arafat Chawdhury👨‍💻</a> \n\n"
+            f" - Contact My Dev for any inquiries or concerns. <a href=\"tg://user?id=7303810912\">Abir Arafat Chawdhury👨‍💻</a> \n\n"
             f"Thank you for using <b>Smart Util ⚙️</b>. We prioritize your safety, security, and best user experience. 🚀"
         )
         back_button = SmartButtons()
