@@ -18,13 +18,14 @@ async def main():
                     import_module(f"{modules_path}.{module_name}")
                 except Exception as e:
                     LOGGER.error(f"Failed to load module {module_name}: {e}")
-
+        
         dp.callback_query.register(handle_callback_query)
-
+        
         await SmartPyro.start()
         await SmartUserBot.start()
+        
         LOGGER.info("Bot Successfully Started 💥")
-
+        
         restart_data = await SmartReboot.find_one()
         if restart_data:
             try:
@@ -38,8 +39,22 @@ async def main():
                 LOGGER.info(f"Restart message updated and cleared from database for chat {restart_data['chat_id']}")
             except Exception as e:
                 LOGGER.error(f"Failed to update restart message: {e}")
-
-        await dp.start_polling(SmartAIO, drop_pending_updates=True)
+        
+        try:
+            await SmartAIO.delete_webhook(drop_pending_updates=True)
+            LOGGER.info("Cleared any existing webhook and pending updates")
+        except Exception as e:
+            LOGGER.warning(f"Could not clear webhook: {e}")
+        
+        await asyncio.sleep(1)
+        
+        await dp.start_polling(
+            SmartAIO, 
+            drop_pending_updates=True,
+            allowed_updates=dp.resolve_used_update_types(),
+            handle_signals=False
+        )
+        
     except asyncio.CancelledError:
         LOGGER.info("Polling cancelled, shutting down...")
         raise
@@ -56,11 +71,11 @@ if __name__ == "__main__":
         LOGGER.info("Stop signal received. Shutting down...")
         try:
             stop_tasks = []
-            if SmartAIO.session.is_connected:
+            if hasattr(SmartAIO, 'session') and SmartAIO.session and SmartAIO.session.is_connected:
                 stop_tasks.append(SmartAIO.session.stop())
-            if SmartPyro.is_connected:
+            if hasattr(SmartPyro, 'is_connected') and SmartPyro.is_connected:
                 stop_tasks.append(SmartPyro.stop())
-            if SmartUserBot.is_connected:
+            if hasattr(SmartUserBot, 'is_connected') and SmartUserBot.is_connected:
                 stop_tasks.append(SmartUserBot.stop())
             if stop_tasks:
                 loop.run_until_complete(asyncio.gather(*stop_tasks))
