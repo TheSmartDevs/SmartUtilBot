@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import aiohttp
 import asyncio
 from aiogram import Bot
@@ -16,6 +13,7 @@ from bot.helpers.utils import new_task
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.defend import SmartDefender
 from config import OPENAI_API_KEY
+import re
 
 async def fetch_gpt_response(prompt, model):
     if not OPENAI_API_KEY or OPENAI_API_KEY.strip() == "":
@@ -30,7 +28,7 @@ async def fetch_gpt_response(prompt, model):
         data = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 500,
+            "max_tokens": 1500,
             "n": 1,
             "stop": None,
             "temperature": 0.5
@@ -49,6 +47,45 @@ async def fetch_gpt_response(prompt, model):
         except Exception as e:
             LOGGER.error(f"Error fetching GPT response: {e}")
             return None
+
+def escape_html(text):
+    html_escape_table = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "`": "&#96;",
+        "\"": "&quot;",
+        "'": "&apos;"
+    }
+    return "".join(html_escape_table.get(c, c) for c in text)
+
+def format_code_response(text):
+    replacements = [
+        (r"^> (.*)", r"<blockquote>\1</blockquote>"),
+        (r"```(?:\w*)\n([\s\S]*?)\n```", r"<pre>\1</pre>"),
+        (r"`(.*?)`", r"<code>\1</code>"),
+        (r"\*\*(.*?)\*\*", r"<b>\1</b>"),
+        (r"\*(.*?)\*", r"<i>\1</i>"),
+        (r"__(.*?)__", r"<i>\1</i>"),
+        (r"_(.*?)_", r"<i>\1</i>"),
+        (r"~~(.*?)~~", r"<s>\1</s>"),
+        (r"\[(.*?)\]\((.*?)\)", r'<a href="\2">\1</a>')
+    ]
+    parts = []
+    last_pos = 0
+    code_block_pattern = re.compile(r"```(?:\w*)\n([\s\S]*?)\n```", re.MULTILINE | re.DOTALL)
+    for match in code_block_pattern.finditer(text):
+        start, end = match.span()
+        parts.append(escape_html(text[last_pos:start]))
+        parts.append(f"<pre>{escape_html(match.group(1))}</pre>")
+        last_pos = end
+    parts.append(escape_html(text[last_pos:]))
+    text = "".join(parts)
+    for pattern, replacement in replacements[2:]:  # Skip code block replacement
+        text = re.sub(pattern, replacement, text, flags=re.MULTILINE | re.DOTALL)
+    text = re.sub(r'<!DOCTYPE[^>]*>|<!doctype[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'<\?[\s\S]*?\?>', '', text)
+    return text
 
 @dp.message(Command(commands=["gpt4"], prefix=BotCommands))
 @new_task
@@ -118,20 +155,36 @@ async def gpt_handler(message: Message, bot: Bot):
         await asyncio.sleep(1)
         response_text = await fetch_gpt_response(prompt, "gpt-4o-mini")
         if response_text:
-            if len(response_text) > 4000:
+            formatted_text = format_code_response(response_text)
+            if len(formatted_text) > 4096:
                 await delete_messages(message.chat.id, progress_message.message_id)
-                parts = [response_text[i:i+4000] for i in range(0, len(response_text), 4000)]
+                parts = []
+                current_part = ""
+                for line in formatted_text.splitlines(True):
+                    if len(current_part) + len(line) <= 4096:
+                        current_part += line
+                    else:
+                        if current_part:
+                            parts.append(current_part)
+                        current_part = line
+                if current_part:
+                    parts.append(current_part)
                 for part in parts:
-                    await send_message(
-                        chat_id=message.chat.id,
-                        text=part,
-                        parse_mode=ParseMode.HTML
-                    )
+                    try:
+                        await send_message(
+                            chat_id=message.chat.id,
+                            text=part,
+                            parse_mode=ParseMode.HTML
+                        )
+                        await asyncio.sleep(0.5)  # Avoid rate limits
+                    except TelegramBadRequest as send_e:
+                        LOGGER.error(f"Failed to send message part to chat {message.chat.id}: {str(send_e)}")
+                        await Smart_Notify(bot, "gpt", send_e, message)
                 LOGGER.info(f"Successfully sent GPT response (split) to chat {message.chat.id}")
             else:
                 try:
                     await progress_message.edit_text(
-                        text=response_text,
+                        text=formatted_text,
                         parse_mode=ParseMode.HTML
                     )
                     LOGGER.info(f"Successfully sent GPT response to chat {message.chat.id}")
@@ -141,7 +194,7 @@ async def gpt_handler(message: Message, bot: Bot):
                     await delete_messages(message.chat.id, progress_message.message_id)
                     await send_message(
                         chat_id=message.chat.id,
-                        text=response_text,
+                        text=formatted_text,
                         parse_mode=ParseMode.HTML
                     )
                     LOGGER.info(f"Successfully sent GPT response to chat {message.chat.id}")
