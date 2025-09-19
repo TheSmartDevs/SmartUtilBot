@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import asyncio
 import os
 import shutil
@@ -10,7 +7,7 @@ from aiogram import Bot
 from aiogram.filters import Command
 from aiogram.types import Message
 from pyrogram.enums import ParseMode as SmartParseMode
-from bot import dp, SmartPyro
+from bot import dp, SmartPyro, SmartUserBot
 from bot.helpers.botutils import send_message
 from bot.helpers.guard import admin_only
 from bot.core.database import SmartReboot
@@ -20,7 +17,7 @@ from config import UPDATE_CHANNEL_URL
 async def cleanup_restart_data():
     try:
         await SmartReboot.delete_many({})
-        LOGGER.info("Cleaned up any existing restart messages from database")
+        LOGGER.info("Cleaned up existing restart messages from database")
     except Exception as e:
         LOGGER.error(f"Failed to cleanup restart data: {e}")
 
@@ -34,7 +31,7 @@ def validate_message(func):
 
 async def run_restart_task(bot: Bot, chat_id: int, status_message_id: int):
     session_file = "SmartUtilBot.session"
-    if not os.access(session_file, os.W_OK) if os.path.exists(session_file) else True:
+    if os.path.exists(session_file) and not os.access(session_file, os.W_OK):
         try:
             os.chmod(session_file, 0o600)
             LOGGER.info(f"Set write permissions for {session_file}")
@@ -43,7 +40,7 @@ async def run_restart_task(bot: Bot, chat_id: int, status_message_id: int):
             await bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=status_message_id,
-                text="<b>Failed To Restart Due To ReadOnly Environment</b>",
+                text="<b>Failed To Restart: Read-Only Environment</b>",
                 parse_mode=SmartParseMode.HTML
             )
             return
@@ -66,19 +63,7 @@ async def run_restart_task(bot: Bot, chat_id: int, status_message_id: int):
             LOGGER.error(f"Failed to clear log file {log_file}: {e}")
 
     start_script = "start.sh"
-    main_script = "main.py"
-
-    if not os.path.exists(start_script):
-        if not os.path.exists(main_script):
-            await bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=status_message_id,
-                text="<b>Failed To Restart Due To Missing Scripts</b>",
-                parse_mode=SmartParseMode.HTML
-            )
-            LOGGER.error("Neither start.sh nor main.py found")
-            return
-        start_script = None
+    module_execution = ["python3", "-m", "bot"]
 
     try:
         await cleanup_restart_data()
@@ -90,10 +75,20 @@ async def run_restart_task(bot: Bot, chat_id: int, status_message_id: int):
         LOGGER.info(f"Stored restart message details for chat {chat_id}")
         await asyncio.sleep(2)
 
-        if start_script:
-            if not os.access(start_script, os.X_OK):
-                os.chmod(start_script, 0o755)
-                LOGGER.info(f"Set execute permissions for {start_script}")
+        try:
+            if SmartPyro.is_connected:
+                await SmartPyro.stop()
+                LOGGER.info("Terminated SmartPyro session")
+            if SmartUserBot.is_connected:
+                await SmartUserBot.stop()
+                LOGGER.info("Terminated SmartUserBot session")
+            if bot.session.is_connected:
+                await bot.session.stop()
+                LOGGER.info("Terminated SmartAIO session")
+        except Exception as e:
+            LOGGER.error(f"Failed to terminate sessions: {e}")
+
+        if os.path.exists(start_script) and os.access(start_script, os.X_OK):
             process = subprocess.Popen(
                 ["bash", start_script],
                 stdin=subprocess.DEVNULL,
@@ -104,18 +99,18 @@ async def run_restart_task(bot: Bot, chat_id: int, status_message_id: int):
             LOGGER.info("Started bot using bash script")
         else:
             process = subprocess.Popen(
-                [sys.executable, main_script],
+                module_execution,
                 stdin=subprocess.DEVNULL,
                 stdout=None,
                 stderr=None,
                 start_new_session=True,
                 cwd=os.getcwd()
             )
-            LOGGER.info("Started bot using direct python execution")
+            LOGGER.info("Started bot using python3 -m bot")
 
         await asyncio.sleep(3)
         if process.poll() is not None and process.returncode != 0:
-            raise subprocess.CalledProcessError(process.returncode, start_script or main_script)
+            raise subprocess.CalledProcessError(process.returncode, "bot")
 
         LOGGER.info("Restart executed successfully, shutting down current instance")
         await asyncio.sleep(2)
@@ -127,16 +122,16 @@ async def run_restart_task(bot: Bot, chat_id: int, status_message_id: int):
         await bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message_id,
-            text="<b>Failed To Restart Invalid Script Format</b>",
+            text="<b>Failed To Restart: Invalid Script Execution</b>",
             parse_mode=SmartParseMode.HTML
         )
     except FileNotFoundError:
-        LOGGER.error("Bash shell or script not found")
+        LOGGER.error("Python or bash shell not found")
         await SmartReboot.delete_one({"chat_id": chat_id, "msg_id": status_message_id})
         await bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message_id,
-            text="<b>Failed To Restart Due To Unix Issue</b>",
+            text="<b>Failed To Restart: System Command Not Found</b>",
             parse_mode=SmartParseMode.HTML
         )
     except Exception as e:
@@ -145,7 +140,7 @@ async def run_restart_task(bot: Bot, chat_id: int, status_message_id: int):
         await bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message_id,
-            text="<b>Failed To Restart Due To System Error</b>",
+            text="<b>Failed To Restart: System Error</b>",
             parse_mode=SmartParseMode.HTML
         )
 
@@ -205,6 +200,19 @@ async def stop_handler(message: Message, bot: Bot):
                 LOGGER.error(f"Failed to clear log file {log_file}: {e}")
 
         await cleanup_restart_data()
+        try:
+            if SmartPyro.is_connected:
+                await SmartPyro.stop()
+                LOGGER.info("Terminated SmartPyro session")
+            if SmartUserBot.is_connected:
+                await SmartUserBot.stop()
+                LOGGER.info("Terminated SmartUserBot session")
+            if bot.session.is_connected:
+                await bot.session.stop()
+                LOGGER.info("Terminated SmartAIO session")
+        except Exception as e:
+            LOGGER.error(f"Failed to terminate sessions: {e}")
+
         await bot.edit_message_text(
             chat_id=message.chat.id,
             message_id=status_message.message_id,
@@ -213,7 +221,7 @@ async def stop_handler(message: Message, bot: Bot):
         )
         await asyncio.sleep(2)
         try:
-            subprocess.run(["pkill", "-f", "main.py"], check=False, timeout=5)
+            subprocess.run(["pkill", "-f", "python3 -m bot"], check=False, timeout=5)
         except (subprocess.TimeoutExpired, FileNotFoundError):
             LOGGER.warning("pkill command failed or timed out, using direct exit")
         os._exit(0)
@@ -222,7 +230,7 @@ async def stop_handler(message: Message, bot: Bot):
         await bot.edit_message_text(
             chat_id=message.chat.id,
             message_id=status_message.message_id,
-            text="<b>Failed To Stop Bot Due To System Error</b>",
+            text="<b>Failed To Stop Bot: System Error</b>",
             parse_mode=SmartParseMode.HTML
         )
         await asyncio.sleep(2)
