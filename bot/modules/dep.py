@@ -18,10 +18,46 @@ from bot.helpers.notify import Smart_Notify
 from bot.helpers.defend import SmartDefender
 from config import GROQ_API_KEY, GROQ_API_URL, TEXT_MODEL
 
-def sanitize_html(text):
+def escape_html(text):
+    html_escape_table = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "`": "&#96;",
+        "\"": "&quot;",
+        "'": "&apos;"
+    }
+    return "".join(html_escape_table.get(c, c) for c in text)
+
+def format_code_response(text):
     text = re.sub(r'</?think[^>]*>', '', text, flags=re.IGNORECASE)
+    replacements = [
+        (r"^> (.*)", r"<blockquote>\1</blockquote>"),
+        (r"```(?:\w*)\n([\s\S]*?)\n```", r"<pre>\1</pre>"),
+        (r"`(.*?)`", r"<code>\1</code>"),
+        (r"\*\*(.*?)\*\*", r"<b>\1</b>"),
+        (r"\*(.*?)\*", r"<i>\1</i>"),
+        (r"__(.*?)__", r"<i>\1</i>"),
+        (r"_(.*?)_", r"<i>\1</i>"),
+        (r"~~(.*?)~~", r"<s>\1</s>"),
+        (r"\[(.*?)\]\((.*?)\)", r'<a href="\2">\1</a>')
+    ]
+    parts = []
+    last_pos = 0
+    code_block_pattern = re.compile(r"```(?:\w*)\n([\s\S]*?)\n```", re.MULTILINE | re.DOTALL)
+    for match in code_block_pattern.finditer(text):
+        start, end = match.span()
+        parts.append(escape_html(text[last_pos:start]))
+        parts.append(f"<pre>{escape_html(match.group(1))}</pre>")
+        last_pos = end
+    parts.append(escape_html(text[last_pos:]))
+    text = "".join(parts)
+    for pattern, replacement in replacements[2:]:
+        text = re.sub(pattern, replacement, text, flags=re.MULTILINE | re.DOTALL)
+    text = re.sub(r'<!DOCTYPE[^>]*>|<!doctype[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'<\?[\s\S]*?\?>', '', text)
     return text
-    
+
 @dp.message(Command(commands=["dep"], prefix=BotCommands))
 @new_task
 @SmartDefender
@@ -65,21 +101,36 @@ async def dep_handler(message: Message, bot: Bot):
                 if response.status == 200:
                     data = await response.json()
                     bot_response = data.get("choices", [{}])[0].get("message", {}).get("content", "Sorry DeepSeek API Dead")
-                    bot_response = sanitize_html(bot_response)
+                    bot_response = format_code_response(bot_response)
                 else:
                     error_response = await response.text()
                     LOGGER.error(f"DeepSeekAI API request failed with status {response.status}: {error_response}")
                     await Smart_Notify(bot, "dep", f"API request failed with status {response.status}: {error_response}", message)
                     bot_response = "<b>❌ Sorry Bro DeepSeekAI ✨ API Dead</b>"
-        if len(bot_response) > 4000:
+        if len(bot_response) > 4096:
             await delete_messages(message.chat.id, progress_message.message_id)
-            parts = [bot_response[i:i+4000] for i in range(0, len(bot_response), 4000)]
+            parts = []
+            current_part = ""
+            for line in bot_response.splitlines(True):
+                if len(current_part) + len(line) <= 4096:
+                    current_part += line
+                else:
+                    if current_part:
+                        parts.append(current_part)
+                    current_part = line
+            if current_part:
+                parts.append(current_part)
             for part in parts:
-                await send_message(
-                    chat_id=message.chat.id,
-                    text=part,
-                    parse_mode=ParseMode.HTML
-                )
+                try:
+                    await send_message(
+                        chat_id=message.chat.id,
+                        text=part,
+                        parse_mode=ParseMode.HTML
+                    )
+                    await asyncio.sleep(0.5)
+                except TelegramBadRequest as send_e:
+                    LOGGER.error(f"Failed to send message part to chat {message.chat.id}: {str(send_e)}")
+                    await Smart_Notify(bot, "dep", send_e, message)
             LOGGER.info(f"Successfully sent DeepSeekAI response (split) to chat {message.chat.id}")
         else:
             try:
