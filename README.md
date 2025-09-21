@@ -28,26 +28,6 @@
 
 ---
 
-## 📊 Project Stats
-
-<div align="center">
-
-<table>
-<tr>
-<td align="center">
-<img src="https://github-readme-stats.vercel.app/api?username=TheSmartDevs&show_icons=true&theme=radical" alt="GitHub Stats" />
-</td>
-<td align="center">
-<img src="https://github-readme-stats.vercel.app/api/top-langs/?username=TheSmartDevs&layout=compact&theme=radical" alt="Top Languages" />
-</td>
-</tr>
-</table>
-
-![Profile Views](https://komarev.com/ghpvc/?username=TheSmartDevs&color=blue&style=for-the-badge)
-![Last Commit](https://img.shields.io/github/last-commit/TheSmartDevs/SmartUtilBot?style=for-the-badge&color=red)
-![Repository Size](https://img.shields.io/github/repo-size/TheSmartDevs/SmartUtilBot?style=for-the-badge&color=orange)
-
-</div>
 
 ---
 
