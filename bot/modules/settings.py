@@ -211,15 +211,11 @@ async def close_menu(query: CallbackQuery, bot: Bot):
         LOGGER.error(f"Failed to close settings menu for user_id {user_id}: {e}")
         await query.answer("❌ Failed to close!", show_alert=True)
 
-@dp.message(lambda message: F.text & any(message.text.startswith(prefix) for prefix in BotCommands))
+@dp.message(lambda message: message.text is not None and any(message.text.startswith(prefix) for prefix in BotCommands) and message.from_user.id in user_session and user_session.get(message.from_user.id, {}).get("chat_id") == message.chat.id)
 @validate_message
 @admin_only
 async def update_value(message: Message, bot: Bot):
     LOGGER.debug(f"Received message for update_value: user_id={message.from_user.id}, text={message.text}, chat_id={message.chat.id}")
-    session = user_session.get(message.from_user.id)
-    if not session or session["chat_id"] != message.chat.id:
-        LOGGER.debug(f"Rejected update_value for user_id {message.from_user.id}: session={session}, chat_id={message.chat.id}")
-        return
     message_text = message.text or message.caption
     if not message_text:
         LOGGER.debug(f"No valid text in message for user_id {message.from_user.id}")
@@ -243,7 +239,7 @@ async def update_value(message: Message, bot: Bot):
             parse_mode=SmartParseMode.HTML
         )
         return
-    var = session["var"]
+    var = user_session[message.from_user.id]["var"]
     try:
         await update_env_var(var, val)
         config_keys[var] = val
