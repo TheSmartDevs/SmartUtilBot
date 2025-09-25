@@ -1,372 +1,262 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
-import os
-import re
-import io
-import math
-import time
 import asyncio
-import aiohttp
-import aiofiles
-from pathlib import Path
-from typing import Optional, Tuple
-from datetime import datetime, timedelta
-from aiogram import Bot
+import os
+from aiogram import Bot, F
 from aiogram.filters import Command
-from aiogram.types import Message
-from aiogram.enums import ParseMode
+from aiogram.types import Message, CallbackQuery
 from pyrogram.enums import ParseMode as SmartParseMode
-from pyrogram.types import Message as SmartMessage
-from concurrent.futures import ThreadPoolExecutor
-from moviepy import VideoFileClip
-from PIL import Image
-import yt_dlp
 from bot import dp, SmartPyro
-from bot.helpers.utils import new_task, clean_download
-from bot.helpers.botutils import send_message, delete_messages, get_args
+from bot.helpers.botutils import send_message, get_args
 from bot.helpers.commands import BotCommands
+from bot.helpers.buttons import SmartButtons
 from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
-from bot.helpers.pgbar import progress_bar
-from bot.helpers.defend import SmartDefender
-from config import YT_COOKIES_PATH, VIDEO_RESOLUTION, MAX_VIDEO_SIZE
+from bot.helpers.guard import admin_only
 
-logger = LOGGER
+user_session = {}
+settings_lock = asyncio.Lock()
+ITEMS_PER_PAGE = 10
 
-class Config:
-    TEMP_DIR = Path("./downloads")
-    HEADERS = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    }
+def validate_message(func):
+    async def wrapper(message: Message, bot: Bot):
+        if not message or not message.from_user:
+            LOGGER.error("Invalid message received")
+            return
+        return await func(message, bot)
+    return wrapper
 
-Config.TEMP_DIR.mkdir(exist_ok=True)
-
-executor = ThreadPoolExecutor(max_workers=6)
-
-def sanitize_filename(title: str) -> str:
-    title = re.sub(r'[<>:"/\\|?*]', '', title[:50]).replace(' ', '_')
-    return f"{title}_{int(time.time())}"
-
-def format_size(size_bytes: int) -> str:
-    if not size_bytes:
-        return "0B"
-    units = ("B", "KB", "MB", "GB")
-    i = int(math.log(size_bytes, 1024))
-    return f"{round(size_bytes / (1024 ** i), 2)} {units[i]}"
-
-def format_duration(seconds: int) -> str:
-    hours, seconds = divmod(seconds, 3600)
-    minutes, seconds = divmod(seconds, 60)
-    return f"{hours}h {minutes}m {seconds}s" if hours else f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
-
-async def get_video_duration(video_path: str) -> float:
+def detect_duplicate_keys():
     try:
-        clip = VideoFileClip(video_path)
-        duration = clip.duration
-        clip.close()
-        return duration
+        with open(".env") as f:
+            lines = f.readlines()
+            seen_keys = set()
+            duplicates = set()
+            for line in lines:
+                if '=' in line:
+                    key = line.split("=", 1)[0].strip()
+                    if key in seen_keys:
+                        duplicates.add(key)
+                    seen_keys.add(key)
+            if duplicates:
+                LOGGER.warning(f"Duplicate keys found in .env: {', '.join(duplicates)}")
     except Exception as e:
-        return 0.0
+        LOGGER.error(f"Error detecting duplicate keys in .env: {e}")
 
-def youtube_parser(url: str) -> Optional[str]:
-    youtube_patterns = [
-        r"(?:youtube\.com/shorts/)([^\"&?/ ]{11})(\?.*)?",
-        r"(?:youtube\.com/(?:[^/]+/.+/|(?:v|e(?:mbed)?)|.*[?&]v=)|youtu\.be/)([^\"&?/ ]{11})",
-        r"(?:youtube\.com/watch\?v=)([^\"&?/ ]{11})",
-        r"(?:m\.youtube\.com/watch\?v=)([^\"&?/ ]{11})",
-        r"(?:youtube\.com/embed/)([^\"&?/ ]{11})",
-        r"(?:youtube\.com/v/)([^\"&?/ ]{11})"
-    ]
- 
-    for pattern in youtube_patterns:
-        match = re.search(pattern, url)
-        if match:
-            video_id = match.group(1)
-            if "shorts" in url.lower():
-                standardized_url = f"https://www.youtube.com/shorts/{video_id}"
-                return standardized_url
-            else:
-                standardized_url = f"https://www.youtube.com/watch?v={video_id}"
-                return standardized_url
- 
-    return None
-
-def get_ydl_opts(output_path: str, is_audio: bool = False) -> dict:
-    width, height = VIDEO_RESOLUTION
-    base = {
-        'outtmpl': output_path + '.%(ext)s',
-        'cookiefile': YT_COOKIES_PATH,
-        'quiet': True,
-        'noprogress': True,
-        'nocheckcertificate': True,
-        'socket_timeout': 60,
-        'retries': 3,
-        'merge_output_format': 'mp4',
-    }
-    if is_audio:
-        base.update({
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192'
-            }]
-        })
-    else:
-        base.update({
-            'format': f'bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={height}]+bestaudio/best[height<={height}]/best',
-            'postprocessors': [{
-                'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'mp4'
-            }],
-            'prefer_ffmpeg': True,
-            'postprocessor_args': {
-                'FFmpegVideoConvertor': ['-c:v', 'libx264', '-c:a', 'aac', '-f', 'mp4']
-            }
-        })
-    return base
-
-async def download_media(url: str, is_audio: bool, status: Message, bot: Bot) -> Tuple[Optional[dict], Optional[str]]:
-    parsed_url = youtube_parser(url)
-    if not parsed_url:
-        await status.edit_text("<b>Invalid YouTube ID Or URL</b>", parse_mode=ParseMode.HTML)
-        await Smart_Notify(bot, f"{BotCommands}yt", Exception("Invalid YouTube URL"), status)
-        return None, "Invalid YouTube URL"
- 
+def load_env_vars():
     try:
-        ydl_opts_info = {
-            'cookiefile': YT_COOKIES_PATH,
-            'quiet': True,
-            'socket_timeout': 30,
-            'retries': 2
-        }
-        with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
-            info = await asyncio.wait_for(
-                asyncio.get_event_loop().run_in_executor(executor, ydl.extract_info, parsed_url, False),
-                timeout=45
-            )
-     
-        if not info:
-            await status.edit_text(f"<b>Sorry Bro {'Audio' if is_audio else 'Video'} Not Found</b>", parse_mode=ParseMode.HTML)
-            await Smart_Notify(bot, f"{BotCommands}yt", Exception("No media info found"), status)
-            return None, "No media info found"
-     
-        duration = info.get('duration', 0)
-        if duration > 7200:
-            await status.edit_text(f"<b>Sorry Bro {'Audio' if is_audio else 'Video'} Is Over 2hrs</b>", parse_mode=ParseMode.HTML)
-            await Smart_Notify(bot, f"{BotCommands}yt", Exception("Media duration exceeds 2 hours"), status)
-            return None, "Media duration exceeds 2 hours"
-     
-        await status.edit_text("<b>Found ☑️ Downloading...</b>", parse_mode=ParseMode.HTML)
-     
-        title = info.get('title', 'Unknown')
-        safe_title = sanitize_filename(title)
-        output_path = f"{Config.TEMP_DIR}/{safe_title}"
-     
-        opts = get_ydl_opts(output_path, is_audio)
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            await asyncio.get_event_loop().run_in_executor(executor, ydl.download, [parsed_url])
-     
-        file_path = f"{output_path}.mp3" if is_audio else f"{output_path}.mp4"
-        if not os.path.exists(file_path) and not is_audio:
-            for ext in ['.webm', '.mkv']:
-                alt_path = f"{output_path}{ext}"
-                if os.path.exists(alt_path):
-                    try:
-                        clip = VideoFileClip(alt_path)
-                        clip.write_videofile(file_path, codec='libx264', audio_codec='aac')
-                        clip.close()
-                        clean_download(alt_path)
-                        break
-                    except Exception as e:
-                        clean_download(alt_path)
-                        continue
-                else:
-                    continue
-     
-        if not os.path.exists(file_path):
-            await status.edit_text(f"<b>Sorry Bro {'Audio' if is_audio else 'Video'} Not Found</b>", parse_mode=ParseMode.HTML)
-            await Smart_Notify(bot, f"{BotCommands}yt", Exception(f"Download failed, file not found: {file_path}"), status)
-            return None, "Download failed"
-     
-        file_size = os.path.getsize(file_path)
-        if file_size > MAX_VIDEO_SIZE:
-            clean_download(file_path)
-            await status.edit_text(f"<b>Sorry Bro {'Audio' if is_audio else 'Video'} Is Over 2GB</b>", parse_mode=ParseMode.HTML)
-            await Smart_Notify(bot, f"{BotCommands}yt", Exception("File size exceeds 2GB"), status)
-            return None, "File exceeds 2GB"
-     
-        thumbnail_path = await prepare_thumbnail(info.get('thumbnail'), output_path, bot)
-        duration = await get_video_duration(file_path) if not is_audio else info.get('duration', 0)
-     
-        metadata = {
-            'file_path': file_path,
-            'title': title,
-            'views': info.get('view_count', 0),
-            'duration': format_duration(int(duration)),
-            'file_size': format_size(file_size),
-            'thumbnail_path': thumbnail_path
-        }
-     
-        return metadata, None
-    except asyncio.TimeoutError:
-        await status.edit_text("<b>Sorry Bro YouTubeDL API Dead</b>", parse_mode=ParseMode.HTML)
-        await Smart_Notify(bot, f"{BotCommands}yt", asyncio.TimeoutError("Metadata fetch timed out"), status)
-        return None, "Metadata fetch timed out"
+        with open(".env") as f:
+            lines = f.readlines()
+            variables = {}
+            seen_keys = set()
+            for line in lines:
+                if '=' in line:
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    value = value.strip()
+                    if key not in seen_keys:
+                        variables[key] = value
+                        seen_keys.add(key)
+            return variables
     except Exception as e:
-        await status.edit_text("<b>Sorry Bro YouTubeDL API Dead</b>", parse_mode=ParseMode.HTML)
-        await Smart_Notify(bot, f"{BotCommands}yt", e, status)
-        return None, f"Download failed: {str(e)}"
+        LOGGER.error(f"Error loading environment variables: {e}")
+        return {}
 
-async def prepare_thumbnail(thumbnail_url: str, output_path: str, bot: Bot) -> Optional[str]:
-    if not thumbnail_url:
-        return None
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(thumbnail_url) as resp:
-                if resp.status != 200:
-                    await Smart_Notify(bot, f"{BotCommands}yt", Exception(f"Failed to fetch thumbnail, status: {resp.status}"), None)
-                    return None
-                data = await resp.read()
-     
-        thumbnail_path = f"{output_path}_thumb.jpg"
-        with Image.open(io.BytesIO(data)) as img:
-            img.convert('RGB').save(thumbnail_path, "JPEG", quality=85)
-        return thumbnail_path
-    except Exception as e:
-        await Smart_Notify(bot, f"{BotCommands}yt", e, None)
-        return None
-
-async def search_youtube(query: str, retries: int = 2, bot: Bot = None) -> Optional[str]:
-    opts = {
-        'default_search': 'ytsearch1',
-        'cookiefile': YT_COOKIES_PATH,
-        'quiet': True,
-        'simulate': True,
-    }
- 
-    for attempt in range(retries):
+async def update_env_var(key, value):
+    async with settings_lock:
         try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = await asyncio.get_event_loop().run_in_executor(executor, ydl.extract_info, query, False)
-                if info.get('entries'):
-                    url = info['entries'][0]['webpage_url']
-                    return url
-             
-                simplified_query = re.sub(r'[^\w\s]', '', query).strip()
-                if simplified_query != query:
-                    info = await asyncio.get_event_loop().run_in_executor(executor, ydl.extract_info, simplified_query, False)
-                    if info.get('entries'):
-                        url = info['entries'][0]['webpage_url']
-                        return url
+            env_vars = load_env_vars()
+            env_vars[key] = value
+            os.environ[key] = value
+            with open(".env", "w") as f:
+                for k, v in env_vars.items():
+                    f.write(f"{k}={v}\n")
+            LOGGER.info(f"Updated environment variable: {key}")
         except Exception as e:
-            if attempt == retries - 1:
-                await Smart_Notify(bot, f"{BotCommands}yt", e, None)
-            if attempt < retries - 1:
-                await asyncio.sleep(1)
-    return None
+            LOGGER.error(f"Error updating environment variable {key}: {e}")
 
-async def handle_media_request(message: Message, bot: Bot, query: str, is_audio: bool = False):
-    status = await send_message(
-        chat_id=message.chat.id,
-        text=f"<b>Searching The {'Audio' if is_audio else 'Video'}</b>",
-        parse_mode=ParseMode.HTML
-    )
- 
-    video_url = youtube_parser(query) if youtube_parser(query) else await search_youtube(query, bot=bot)
-    if not video_url:
-        await status.edit_text(f"<b>Sorry Bro {'Audio' if is_audio else 'Video'} Not Found</b>", parse_mode=ParseMode.HTML)
-        await Smart_Notify(bot, f"{BotCommands}yt", Exception("No video URL found"), message)
-        return
- 
-    result, error = await download_media(video_url, is_audio, status, bot)
-    if error:
-        return
- 
-    user_info = (
-        f"<a href=\"tg://user?id={message.from_user.id}\">{message.from_user.first_name}{' ' + message.from_user.last_name if message.from_user.last_name else ''} {'🇧🇩' if message.from_user.language_code == 'bn' else ''}</a>" if message.from_user
-        else f"<a href=\"https://t.me/{message.chat.username or 'this group'}\">{message.chat.title}</a>"
-    )
-    caption = (
-        f"🎵 <b>Title:</b> <code>{result['title']}</code>\n"
-        f"<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
-        f"👁️‍🗨️ <b>Views:</b> {result['views']}\n"
-        f"<b>🔗 Url:</b> <a href=\"{video_url}\">Watch On YouTube</a>\n"
-        f"⏱️ <b>Duration:</b> {result['duration']}\n"
-        f"<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
-        f"<b>Downloaded By</b> {user_info}"
-    )
- 
-    last_update_time = [0]
-    start_time = time.time()
-    send_func = SmartPyro.send_audio if is_audio else SmartPyro.send_video
-    kwargs = {
-        'chat_id': message.chat.id,
-        'caption': caption,
-        'parse_mode': SmartParseMode.HTML,
-        'thumb': result['thumbnail_path'],
-        'progress': progress_bar,
-        'progress_args': (status, start_time, last_update_time)
-    }
-    if is_audio:
-        kwargs.update({'audio': result['file_path'], 'title': result['title']})
-    else:
-        kwargs.update({
-            'video': result['file_path'],
-            'supports_streaming': True,
-            'height': 720,
-            'width': 1280,
-            'duration': int(await get_video_duration(result['file_path']))
-        })
- 
+config_keys = load_env_vars()
+
+async def build_menu(page=0):
+    keys = list(config_keys.keys())
+    start, end = page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE
+    current_keys = keys[start:end]
+    buttons = SmartButtons()
+    for i in range(0, len(current_keys), 2):
+        buttons.button(text=current_keys[i], callback_data=f"settings_edit_{current_keys[i]}")
+        if i + 1 < len(current_keys):
+            buttons.button(text=current_keys[i + 1], callback_data=f"settings_edit_{current_keys[i + 1]}")
+    if page > 0:
+        buttons.button(text="⬅️ Previous", callback_data=f"settings_page_{page - 1}", position="footer")
+    if end < len(keys):
+        buttons.button(text="Next ➡️", callback_data=f"settings_page_{page + 1}", position="footer")
+    buttons.button(text="Close ❌", callback_data="settings_closesettings", position="footer")
+    return buttons.build_menu(b_cols=2, f_cols=2)
+
+@dp.message(Command(commands=["settings"], prefix=BotCommands))
+@validate_message
+@admin_only
+async def show_settings(message: Message, bot: Bot):
     try:
-        await send_func(**kwargs)
-        await delete_messages(message.chat.id, [status.message_id])
+        await send_message(
+            chat_id=message.chat.id,
+            text="<b>Select a change or edit 👇</b>",
+            parse_mode=SmartParseMode.HTML,
+            reply_markup=await build_menu()
+        )
+        LOGGER.info(f"Settings command initiated by user_id {message.from_user.id}")
     except Exception as e:
-        await status.edit_text("<b>Sorry Bro YouTubeDL API Dead</b>", parse_mode=ParseMode.HTML)
-        await Smart_Notify(bot, f"{BotCommands}yt", e, message)
-        return
- 
-    clean_download(result['file_path'], result['thumbnail_path'])
-
-@dp.message(Command(commands=["yt", "video"], prefix=BotCommands))
-@new_task
-@SmartDefender
-async def video_command(message: Message, bot: Bot):
-    if message.reply_to_message and message.reply_to_message.text:
-        query = message.reply_to_message.text.strip()
-    else:
-        args = get_args(message)
-        query = args[0] if args else None
-   
-    if not query:
+        await Smart_Notify(bot, "show_settings", e, message)
+        LOGGER.error(f"Failed to show settings for user_id {message.from_user.id}: {e}")
         await send_message(
             chat_id=message.chat.id,
-            text="<b>Please provide a video name or link ❌</b>",
-            parse_mode=ParseMode.HTML
+            text="<b>❌ Failed to display settings!</b>",
+            parse_mode=SmartParseMode.HTML
         )
-        return
-   
-    await handle_media_request(message, bot, query)
 
-@dp.message(Command(commands=["song", "mp3"], prefix=BotCommands))
-@new_task
-@SmartDefender
-async def song_command(message: Message, bot: Bot):
-    if message.reply_to_message and message.reply_to_message.text:
-        query = message.reply_to_message.text.strip()
-    else:
-        args = get_args(message)
-        query = args[0] if args else None
-   
-    if not query:
+@dp.callback_query(lambda c: c.data.startswith("settings_page_"))
+async def paginate_menu(query: CallbackQuery, bot: Bot):
+    from bot.core.database import SmartGuards
+    from config import OWNER_ID
+    user_id = query.from_user.id
+    auth_admins_data = await SmartGuards.find({}, {"user_id": 1, "_id": 0}).to_list(None)
+    AUTH_ADMIN_IDS = [admin["user_id"] for admin in auth_admins_data]
+    if user_id != OWNER_ID and user_id not in AUTH_ADMIN_IDS:
+        LOGGER.info(f"Unauthorized pagination attempt by user_id {user_id}")
+        return
+    try:
+        page = int(query.data.split("_")[2])
+        await query.message.edit_reply_markup(reply_markup=await build_menu(page))
+        await query.answer()
+        LOGGER.debug(f"Paginated to page {page} by user_id {user_id}")
+    except Exception as e:
+        await Smart_Notify(bot, "paginate_menu", e)
+        LOGGER.error(f"Failed to paginate settings for user_id {user_id}: {e}")
+        await query.answer("❌ Failed to paginate!", show_alert=True)
+
+@dp.callback_query(lambda c: c.data.startswith("settings_edit_"))
+async def edit_var(query: CallbackQuery, bot: Bot):
+    from bot.core.database import SmartGuards
+    from config import OWNER_ID
+    user_id = query.from_user.id
+    auth_admins_data = await SmartGuards.find({}, {"user_id": 1, "_id": 0}).to_list(None)
+    AUTH_ADMIN_IDS = [admin["user_id"] for admin in auth_admins_data]
+    if user_id != OWNER_ID and user_id not in AUTH_ADMIN_IDS:
+        LOGGER.info(f"Unauthorized edit attempt by user_id {user_id}")
+        return
+    var_name = query.data.split("_", 2)[2]
+    if var_name not in config_keys:
+        await query.answer("Invalid variable selected.", show_alert=True)
+        LOGGER.warning(f"Invalid variable {var_name} selected by user_id {user_id}")
+        return
+    user_session[user_id] = {
+        "var": var_name,
+        "chat_id": query.message.chat.id
+    }
+    buttons = SmartButtons()
+    buttons.button(text="Cancel ❌", callback_data="settings_cancel_edit")
+    reply_markup = buttons.build_menu(b_cols=1)
+    try:
+        await query.message.edit_text(
+            text=f"<b>Editing <code>{var_name}</code>. Please send the new value below with a prefix (e.g., .value).</b>",
+            parse_mode=SmartParseMode.HTML,
+            reply_markup=reply_markup
+        )
+        LOGGER.info(f"User_id {user_id} started editing variable {var_name}")
+    except Exception as e:
+        await Smart_Notify(bot, "edit_var", e)
+        LOGGER.error(f"Failed to edit variable {var_name} for user_id {user_id}: {e}")
+        await query.answer("❌ Failed to start editing!", show_alert=True)
+
+@dp.callback_query(lambda c: c.data == "settings_cancel_edit")
+async def cancel_edit(query: CallbackQuery, bot: Bot):
+    from bot.core.database import SmartGuards
+    from config import OWNER_ID
+    user_id = query.from_user.id
+    auth_admins_data = await SmartGuards.find({}, {"user_id": 1, "_id": 0}).to_list(None)
+    AUTH_ADMIN_IDS = [admin["user_id"] for admin in auth_admins_data]
+    if user_id != OWNER_ID and user_id not in AUTH_ADMIN_IDS:
+        LOGGER.info(f"Unauthorized cancel edit attempt by user_id {user_id}")
+        return
+    user_session.pop(user_id, None)
+    try:
+        await query.message.edit_text(
+            text="<b>Variable Editing Cancelled ❌</b>",
+            parse_mode=SmartParseMode.HTML
+        )
+        await query.answer()
+        LOGGER.info(f"User_id {user_id} cancelled variable editing")
+    except Exception as e:
+        await Smart_Notify(bot, "cancel_edit", e)
+        LOGGER.error(f"Failed to cancel edit for user_id {user_id}: {e}")
+        await query.answer("❌ Failed to cancel!", show_alert=True)
+
+@dp.callback_query(lambda c: c.data == "settings_closesettings")
+async def close_menu(query: CallbackQuery, bot: Bot):
+    from bot.core.database import SmartGuards
+    from config import OWNER_ID
+    user_id = query.from_user.id
+    auth_admins_data = await SmartGuards.find({}, {"user_id": 1, "_id": 0}).to_list(None)
+    AUTH_ADMIN_IDS = [admin["user_id"] for admin in auth_admins_data]
+    if user_id != OWNER_ID and user_id not in AUTH_ADMIN_IDS:
+        LOGGER.info(f"Unauthorized close menu attempt by user_id {user_id}")
+        return
+    try:
+        await query.message.edit_text(
+            text="<b>Closed Settings Menu ✅</b>",
+            parse_mode=SmartParseMode.HTML
+        )
+        await query.answer()
+        LOGGER.info(f"User_id {user_id} closed settings menu")
+    except Exception as e:
+        await Smart_Notify(bot, "close_menu", e)
+        LOGGER.error(f"Failed to close settings menu for user_id {user_id}: {e}")
+        await query.answer("❌ Failed to close!", show_alert=True)
+
+@dp.message(lambda message: message.text is not None and any(message.text.startswith(prefix) for prefix in BotCommands) and message.from_user.id in user_session and user_session.get(message.from_user.id, {}).get("chat_id") == message.chat.id)
+@validate_message
+@admin_only
+async def update_value(message: Message, bot: Bot):
+    LOGGER.debug(f"Received message for update_value: user_id={message.from_user.id}, text={message.text}, chat_id={message.chat.id}")
+    message_text = message.text or message.caption
+    if not message_text:
+        LOGGER.debug(f"No valid text in message for user_id {message.from_user.id}")
         await send_message(
             chat_id=message.chat.id,
-            text="<b>Please provide a music name or link ❌</b>",
-            parse_mode=ParseMode.HTML
+            text="<b>Please provide a text value to update with a prefix (e.g., .value) ❌</b>",
+            parse_mode=SmartParseMode.HTML
         )
         return
-   
-    await handle_media_request(message, bot, query, is_audio=True)
+    val = message_text.strip()
+    for prefix in BotCommands:
+        if val.startswith(prefix):
+            val = val[len(prefix):].strip()
+            break
+    LOGGER.debug(f"Processed input for user_id {message.from_user.id}: raw={message_text}, stripped={val}")
+    if not val:
+        LOGGER.debug(f"Empty value after stripping prefix for user_id {message.from_user.id}")
+        await send_message(
+            chat_id=message.chat.id,
+            text="<b>Please provide a non-empty value after the prefix (e.g., .value) ❌</b>",
+            parse_mode=SmartParseMode.HTML
+        )
+        return
+    var = user_session[message.from_user.id]["var"]
+    try:
+        await update_env_var(var, val)
+        config_keys[var] = val
+        await send_message(
+            chat_id=message.chat.id,
+            text=f"<b><code>{var}</code> Has Been Successfully Updated To <code>{val}</code>. ✅</b>",
+            parse_mode=SmartParseMode.HTML
+        )
+        user_session.pop(message.from_user.id, None)
+        LOGGER.info(f"User_id {message.from_user.id} updated variable {var} to {val}")
+    except Exception as e:
+        await Smart_Notify(bot, "update_value", e, message)
+        LOGGER.error(f"Failed to update variable {var} for user_id {message.from_user.id}: {e}")
+        await send_message(
+            chat_id=message.chat.id,
+            text="<b>❌ Failed to update variable!</b>",
+            parse_mode=SmartParseMode.HTML
+        )
+
+detect_duplicate_keys()
