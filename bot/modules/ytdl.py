@@ -21,13 +21,13 @@ from PIL import Image
 import yt_dlp
 from bot import dp, SmartPyro
 from bot.helpers.utils import new_task, clean_download
-from bot.helpers.botutils import send_message, delete_messages, get_args
+from bot.helpers.botutils import send_message, delete_messages
 from bot.helpers.commands import BotCommands
 from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.pgbar import progress_bar
 from bot.helpers.defend import SmartDefender
-from config import YT_COOKIES_PATH, VIDEO_RESOLUTION, MAX_VIDEO_SIZE
+from config import YT_COOKIES_PATH, VIDEO_RESOLUTION, MAX_VIDEO_SIZE, COMMAND_PREFIX
 
 logger = LOGGER
 
@@ -349,7 +349,16 @@ async def video_command(message: Message, bot: Bot):
     if message.reply_to_message and message.reply_to_message.text:
         query = message.reply_to_message.text.strip()
     else:
-        query = message.text.strip()[len(BotCommands) + 4:].strip()
+        command_text = message.text.strip()
+        query = ""
+        for prefix in COMMAND_PREFIX:
+            for cmd in ["yt", "video"]:
+                full_cmd = f"{prefix}{cmd}"
+                if command_text.startswith(full_cmd):
+                    query = command_text[len(full_cmd):].strip()
+                    break
+            if query:
+                break
 
     if not query:
         await send_message(
@@ -368,7 +377,16 @@ async def song_command(message: Message, bot: Bot):
     if message.reply_to_message and message.reply_to_message.text:
         query = message.reply_to_message.text.strip()
     else:
-        query = message.text.strip()[len(BotCommands) + 5:].strip()  
+        command_text = message.text.strip()
+        query = ""
+        for prefix in COMMAND_PREFIX:
+            for cmd in ["song", "mp3"]:
+                full_cmd = f"{prefix}{cmd}"
+                if command_text.startswith(full_cmd):
+                    query = command_text[len(full_cmd):].strip()
+                    break
+            if query:
+                break
 
     if not query:
         await send_message(
