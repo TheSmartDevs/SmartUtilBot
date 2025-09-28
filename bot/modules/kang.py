@@ -19,7 +19,6 @@ from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.buttons import SmartButtons
 from bot.helpers.defend import SmartDefender
-from config import COMMAND_PREFIX
 
 FILE_LOCK = asyncio.Lock()
 
@@ -421,4 +420,5 @@ async def kang_handler(message: Message, bot: Bot):
             )
         LOGGER.info(f"Sent error message to chat {chat_id}")
         for file in temp_files:
+
             clean_download(file)
