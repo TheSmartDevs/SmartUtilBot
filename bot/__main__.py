@@ -36,13 +36,13 @@ async def main():
                     parse_mode="HTML"
                 )
                 await SmartReboot.delete_one({"_id": restart_data["_id"]})
-                LOGGER.info(f"Restart message updated and cleared from database for chat {restart_data['chat_id']}")
+                
             except Exception as e:
                 LOGGER.error(f"Failed to update restart message: {e}")
         
         try:
             await SmartAIO.delete_webhook(drop_pending_updates=True)
-            LOGGER.info("Cleared any existing webhook and pending updates")
+            
         except Exception as e:
             LOGGER.warning(f"Could not clear webhook: {e}")
         
@@ -62,6 +62,25 @@ async def main():
         LOGGER.error(f"Main loop failed: {e}")
         raise
 
+async def cleanup():
+    try:
+        await SmartPyro.stop()
+        LOGGER.info("Terminated SmartPyro session")
+    except Exception as e:
+        LOGGER.error(f"Failed to stop SmartPyro: {e}")
+    
+    try:
+        await SmartUserBot.stop()
+        LOGGER.info("Terminated SmartUserBot session")
+    except Exception as e:
+        LOGGER.error(f"Failed to stop SmartUserBot: {e}")
+    
+    try:
+        await SmartAIO.session.close()
+        LOGGER.info("Closed SmartAIO session")
+    except Exception as e:
+        LOGGER.error(f"Failed to close SmartAIO session: {e}")
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     loop = asyncio.get_event_loop()
@@ -70,17 +89,9 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         LOGGER.info("Stop signal received. Shutting down...")
         try:
-            stop_tasks = []
-            if hasattr(SmartAIO, 'session') and SmartAIO.session and SmartAIO.session.is_connected:
-                stop_tasks.append(SmartAIO.session.stop())
-            if hasattr(SmartPyro, 'is_connected') and SmartPyro.is_connected:
-                stop_tasks.append(SmartPyro.stop())
-            if hasattr(SmartUserBot, 'is_connected') and SmartUserBot.is_connected:
-                stop_tasks.append(SmartUserBot.stop())
-            if stop_tasks:
-                loop.run_until_complete(asyncio.gather(*stop_tasks))
+            loop.run_until_complete(cleanup())
         except Exception as e:
-            LOGGER.error(f"Failed to stop clients: {e}")
+            LOGGER.error(f"Failed to terminate sessions: {e}")
         finally:
             if not loop.is_closed():
                 loop.close()
