@@ -76,17 +76,22 @@ async def run_restart_task(bot: Bot, chat_id: int, status_message_id: int):
         await asyncio.sleep(2)
 
         try:
-            if SmartPyro.is_connected:
-                await SmartPyro.stop()
-                LOGGER.info("Terminated SmartPyro session")
-            if SmartUserBot.is_connected:
-                await SmartUserBot.stop()
-                LOGGER.info("Terminated SmartUserBot session")
-            if bot.session.is_connected:
-                await bot.session.stop()
-                LOGGER.info("Terminated SmartAIO session")
+            await SmartPyro.stop()
+            LOGGER.info("Terminated SmartPyro session")
         except Exception as e:
-            LOGGER.error(f"Failed to terminate sessions: {e}")
+            LOGGER.error(f"Failed to stop SmartPyro: {e}")
+        
+        try:
+            await SmartUserBot.stop()
+            LOGGER.info("Terminated SmartUserBot session")
+        except Exception as e:
+            LOGGER.error(f"Failed to stop SmartUserBot: {e}")
+        
+        try:
+            await bot.session.close()
+            LOGGER.info("Terminated SmartAIO session")
+        except Exception as e:
+            LOGGER.error(f"Failed to close SmartAIO session: {e}")
 
         if os.path.exists(start_script) and os.access(start_script, os.X_OK):
             process = subprocess.Popen(
@@ -200,18 +205,24 @@ async def stop_handler(message: Message, bot: Bot):
                 LOGGER.error(f"Failed to clear log file {log_file}: {e}")
 
         await cleanup_restart_data()
+        
         try:
-            if SmartPyro.is_connected:
-                await SmartPyro.stop()
-                LOGGER.info("Terminated SmartPyro session")
-            if SmartUserBot.is_connected:
-                await SmartUserBot.stop()
-                LOGGER.info("Terminated SmartUserBot session")
-            if bot.session.is_connected:
-                await bot.session.stop()
-                LOGGER.info("Terminated SmartAIO session")
+            await SmartPyro.stop()
+            LOGGER.info("Terminated SmartPyro session")
         except Exception as e:
-            LOGGER.error(f"Failed to terminate sessions: {e}")
+            LOGGER.error(f"Failed to stop SmartPyro: {e}")
+        
+        try:
+            await SmartUserBot.stop()
+            LOGGER.info("Terminated SmartUserBot session")
+        except Exception as e:
+            LOGGER.error(f"Failed to stop SmartUserBot: {e}")
+        
+        try:
+            await bot.session.close()
+            LOGGER.info("Terminated SmartAIO session")
+        except Exception as e:
+            LOGGER.error(f"Failed to close SmartAIO session: {e}")
 
         await bot.edit_message_text(
             chat_id=message.chat.id,
