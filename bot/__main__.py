@@ -1,6 +1,6 @@
 import asyncio
-import logging
 import os
+import uvloop
 from bot import SmartAIO, dp, SmartPyro, SmartUserBot
 from bot.core.database import SmartReboot
 from bot.helpers.logger import LOGGER
@@ -82,7 +82,7 @@ async def cleanup():
         LOGGER.error(f"Failed to close SmartAIO session: {e}")
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    uvloop.install()
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(main())
