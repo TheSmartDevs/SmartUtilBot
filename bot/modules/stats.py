@@ -16,7 +16,9 @@ from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.guard import admin_only
 from bot.core.mongo import SmartUsers
+from bot.modules.string import session_data
 from config import UPDATE_CHANNEL_URL
+import re
 
 async def update_user_activity(user_id: int, chat_id: int = None, is_group: bool = False):
     try:
@@ -244,7 +246,6 @@ async def stats_handler(message: Message, bot: Bot):
             parse_mode=SmartParseMode.HTML
         )
 
-@dp.message(lambda message: message.new_chat_members)
 async def group_added_handler(message: Message, bot: Bot):
     try:
         bot_info = await bot.get_me()
@@ -275,7 +276,7 @@ async def group_removed_handler(update: ChatMemberUpdated, bot: Bot):
         await Smart_Notify(bot, "group_removed_handler", e)
         LOGGER.error(f"Error in group_removed_handler for chat_id {update.chat.id}: {str(e)}")
 
-@dp.message(lambda message: message.chat.type in [ChatType.PRIVATE, ChatType.GROUP, ChatType.SUPERGROUP] and not message.from_user.is_bot and message.text and not message.text.startswith(tuple(BotCommands)))
+@dp.message(lambda message: message.chat.type in [ChatType.PRIVATE, ChatType.GROUP, ChatType.SUPERGROUP] and not message.from_user.is_bot and message.text and not message.text.startswith(tuple(BotCommands)) and message.chat.id not in session_data)
 async def update_user_activity_handler(message: Message, bot: Bot):
     try:
         user_id = message.from_user.id
