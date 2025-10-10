@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import aiohttp
 from aiogram import Bot
 from aiogram.filters import Command
@@ -14,7 +11,6 @@ from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.buttons import SmartButtons
 from bot.helpers.defend import SmartDefender
-from config import COMMAND_PREFIX
 from pyrogram import Client
 from pyrogram.errors import ApiIdInvalid, PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired, SessionPasswordNeeded, PasswordHashInvalid
 from pyrogram.enums import ParseMode as SmartParseMode
@@ -23,6 +19,7 @@ from telethon.sessions import StringSession
 from telethon.errors import ApiIdInvalidError, PhoneNumberInvalidError, PhoneCodeInvalidError, PhoneCodeExpiredError, SessionPasswordNeededError, PasswordHashInvalidError
 from asyncio.exceptions import TimeoutError
 import asyncio
+import re
 
 logger = LOGGER
 TIMEOUT_OTP = 600
@@ -68,7 +65,13 @@ async def callback_query_handler(callback_query: CallbackQuery, bot: Bot):
         return
     await handle_callback_query(bot, callback_query)
 
-@dp.message(lambda message: message.chat.id in session_data and not message.text.startswith(tuple(COMMAND_PREFIX)) and message.chat.type == ChatType.PRIVATE)
+@dp.message(lambda message: message.chat.type == ChatType.PRIVATE and not message.from_user.is_bot and message.text and not message.text.startswith(tuple(BotCommands)) and message.chat.id in session_data and session_data[message.chat.id].get("stage") and (
+    (session_data[message.chat.id].get("stage") == "api_id" and re.match(r'^\d+$', message.text.strip())) or
+    (session_data[message.chat.id].get("stage") == "api_hash" and re.match(r'^[a-fA-F0-9]{32}$', message.text.strip())) or
+    (session_data[message.chat.id].get("stage") == "phone_number" and re.match(r'^\+\d{10,15}$', message.text.strip())) or
+    (session_data[message.chat.id].get("stage") == "otp" and re.match(r'^[\d\s-]{4,12}$', message.text.strip())) or
+    (session_data[message.chat.id].get("stage") == "2fa" and len(message.text.strip()) <= 20)
+))
 @new_task
 @SmartDefender
 async def text_handler(message: Message, bot: Bot):
