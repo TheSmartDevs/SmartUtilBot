@@ -1,3 +1,5 @@
+#Copyright @ISmartCoder
+#Updates Channel @abirxdhackz
 import google.generativeai as genai
 from PIL import Image
 from aiogram import Bot
