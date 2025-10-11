@@ -11,6 +11,7 @@ from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.buttons import SmartButtons
 from bot.helpers.defend import SmartDefender
+from config import COMMAND_PREFIX
 from pyrogram import Client
 from pyrogram.errors import ApiIdInvalid, PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired, SessionPasswordNeeded, PasswordHashInvalid
 from pyrogram.enums import ParseMode as SmartParseMode
@@ -69,7 +70,7 @@ async def callback_query_handler(callback_query: CallbackQuery, bot: Bot):
     (session_data[message.chat.id].get("stage") == "api_id" and re.match(r'^\d+$', message.text.strip())) or
     (session_data[message.chat.id].get("stage") == "api_hash" and re.match(r'^[a-fA-F0-9]{32}$', message.text.strip())) or
     (session_data[message.chat.id].get("stage") == "phone_number" and re.match(r'^\+\d{10,15}$', message.text.strip())) or
-    (session_data[message.chat.id].get("stage") == "otp" and re.match(r'^[\d\s-]{4,12}$', message.text.strip())) or
+    (session_data[message.chat.id].get("stage") == "otp" and re.match(r'^[a-zA-Z0-9\s-]{4,20}$', message.text.strip())) or
     (session_data[message.chat.id].get("stage") == "2fa" and len(message.text.strip()) <= 20)
 ))
 @new_task
@@ -193,6 +194,17 @@ async def handle_text(bot: Bot, message: Message):
         await send_otp(bot, message, otp_message)
     elif stage == "otp":
         otp = ''.join([char for char in message.text if char.isdigit()])
+        if not otp:
+            buttons = SmartButtons()
+            buttons.button(text="Restart", callback_data=f"restart_session_{session['type'].lower()}")
+            buttons.button(text="Close", callback_data="close_session")
+            await send_message(
+                chat_id=chat_id,
+                text="<b>❌Invalid OTP format. Please send OTP with digits (e.g., AB4 BC1 GJ1 GH5 GJ4 for 41154).</b>",
+                parse_mode=ParseMode.HTML,
+                reply_markup=buttons.build_menu(b_cols=2)
+            )
+            return
         session["otp"] = otp
         otp_message = await send_message(
             chat_id=chat_id,
@@ -245,7 +257,16 @@ async def send_otp(bot: Bot, message: Message, otp_message: Message):
         buttons.button(text="Close", callback_data="close_session")
         await send_message(
             chat_id=message.chat.id,
-            text="<b>✅Send The OTP as text. Please send a text message embedding the OTP like: 'AB5 CD0 EF3 GH7 IJ6'</b>",
+            text=(
+                "<b>Send The OTP as text. Please send a text message embedding the OTP like: 'AB5 CD0 EF3 GH7 IJ6'</b>\n\n"
+                "<b>⚠️ Important Notice: </b>Don't send the OTP directly. Always include extra text or spaces.\n\n"
+                "<b>✅ Examples (Your OTP: 123456):</b>\n"
+                "1. OTP is 12AB3456\n"
+                "2. My code: 1 2 3 4 5 6\n"
+                "3. Use AB4 BC1 GJ1 GH5 GJ4\n"
+                "4. Use 123-456 safely\n\n"
+                "<b>👉 This way, the bot can safely extract your OTP. Otherwise, you may not be able to log in.</b>"
+            ),
             parse_mode=ParseMode.HTML,
             reply_markup=buttons.build_menu(b_cols=2)
         )
@@ -256,7 +277,7 @@ async def send_otp(bot: Bot, message: Message, otp_message: Message):
         buttons.button(text="Close", callback_data="close_session")
         await send_message(
             chat_id=message.chat.id,
-            text="<b>❌ <code>API_ID</code> and <code>API_HASH</code> combination is invalid</b>",
+            text="<b>❌ <code>API_ID</code> and <code>API_HASH</code> Combination Is Invalid</b>",
             parse_mode=ParseMode.HTML,
             reply_markup=buttons.build_menu(b_cols=2)
         )
