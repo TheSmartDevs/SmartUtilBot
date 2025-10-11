@@ -17,6 +17,7 @@ import asyncio
 import pygments
 from pygments.lexers import get_lexer_by_name, guess_lexer
 from pygments.formatters import HtmlFormatter
+import os
 
 logger = LOGGER
 genai.configure(api_key=OCR_API_KEY)
@@ -34,7 +35,6 @@ def escape_html(text):
     return "".join(html_escape_table.get(c, c) for c in text)
 
 def format_code_response(text):
-     formatting
     replacements = [
         (r"^> (.*)", r"<blockquote>\1</blockquote>"),
         (r"`(.*?)`", r"<code>\1</code>"),
@@ -45,66 +45,56 @@ def format_code_response(text):
         (r"~~(.*?)~~", r"<s>\1</s>"),
         (r"\[(.*?)\]\((.*?)\)", r'<a href="\2">\1</a>')
     ]
-    
+
     parts = []
     last_pos = 0
     code_block_pattern = re.compile(r"```(\w*)\n([\s\S]*?)\n```", re.MULTILINE | re.DOTALL)
-    
-    
+
     try:
         lexer = guess_lexer(text)
         lang = lexer.name.lower()
         formatted_code = pygments.highlight(text, lexer, HtmlFormatter(nowrap=True))
-        
         formatted_code = re.sub(r'<span[^>]*>(.*?)</span>', r'\1', formatted_code)
         return f"<pre>{formatted_code}</pre>"
     except:
-        pass  # Not a code block, proceed with normal processing
-    
-    
+        pass
+
     for match in code_block_pattern.finditer(text):
         start, end = match.span()
         lang = match.group(1).lower() or None
         code = match.group(2)
-        
-        
+
         parts.append(escape_html(text[last_pos:start]))
-        
-        # Try to detect language if not specified
+
         if not lang:
             try:
                 lexer = guess_lexer(code)
                 lang = lexer.name.lower()
             except:
                 lang = None
-        
-        
+
         if lang:
             try:
                 lexer = get_lexer_by_name(lang, stripall=True)
                 formatted_code = pygments.highlight(code, lexer, HtmlFormatter(nowrap=True))
-                
                 formatted_code = re.sub(r'<span[^>]*>(.*?)</span>', r'\1', formatted_code)
                 parts.append(f"<pre>{formatted_code}</pre>")
             except:
                 parts.append(f"<pre>{escape_html(code)}</pre>")
         else:
             parts.append(f"<pre>{escape_html(code)}</pre>")
-        
+
         last_pos = end
-    
-    
+
     parts.append(escape_html(text[last_pos:]))
     text = "".join(parts)
-    
-    
+
     for pattern, replacement in replacements:
         text = re.sub(pattern, replacement, text, flags=re.MULTILINE | re.DOTALL)
-    
-   
+
     text = re.sub(r'<!DOCTYPE[^>]*>|<!doctype[^>]*>', '', text, flags=re.IGNORECASE)
     text = re.sub(r'<\?[\s\S]*?\?>', '', text)
-    
+
     return text
 
 @dp.message(Command(commands=["ocr"], prefix=BotCommands))
@@ -119,10 +109,11 @@ async def ocr_handler(message: Message, bot: Bot):
             disable_web_page_preview=True
         )
         return
-    
+
     user_id = message.from_user.id
-    logger.info(f"Command received from user {user_id} in chat {message.chat.id}: {message.text}")
-    
+    user_full_name = message.from_user.full_name
+    logger.info(f"OCR Command Received From User {user_full_name} [{user_id}]")
+
     if not message.reply_to_message or not message.reply_to_message.photo:
         await send_message(
             chat_id=message.chat.id,
@@ -131,35 +122,38 @@ async def ocr_handler(message: Message, bot: Bot):
             disable_web_page_preview=True
         )
         return
-    
+
     processing_msg = await send_message(
         chat_id=message.chat.id,
         text="<b>Processing Your Request...✨</b>",
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
     )
-    
+
     photo_path = None
     try:
-        logger.info("Downloading image...")
         photo_file = message.reply_to_message.photo[-1]
+        file_serial = f"{message.message_id}"
+        photo_path = f"downloads/ocr_temp_{file_serial}.jpg"
+        os.makedirs("downloads", exist_ok=True)
+        logger.info(f"Downloading Photo: downloads/ocr_temp_{file_serial}")
+
         if photo_file.file_size > IMGAI_SIZE_LIMIT:
             raise ValueError(f"Image too large. Max {IMGAI_SIZE_LIMIT/1000000}MB allowed")
-        
-        photo_path = f"ocr_temp_{message.message_id}.jpg"
+
         await bot.download(
             file=photo_file,
             destination=photo_path
         )
-        
-        logger.info("Processing image for OCR with GeminiAI...")
+
+        logger.info(f"Processing OCR: downloads/ocr_temp_{file_serial}")
         with Image.open(photo_path) as img:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
             response = model.generate_content(["Extract text from this image of all lang Just Send The Extracted Text No Extra Text Or Hi Hello", img])
             text = response.text
             logger.info(f"OCR Response: {text}")
-            
+
             response_text = text if text else "<b>❌ No readable text found in image.</b>"
             formatted_text = format_code_response(response_text)
             if len(formatted_text) > 4096:
@@ -213,7 +207,7 @@ async def ocr_handler(message: Message, bot: Bot):
                         disable_web_page_preview=True
                     )
                     logger.info(f"Successfully sent OCR response to chat {message.chat.id}")
-    
+
     except Exception as e:
         logger.error(f"OCR Error: {str(e)}")
         await Smart_Notify(bot, "ocr", e, message)
@@ -234,8 +228,8 @@ async def ocr_handler(message: Message, bot: Bot):
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
-    
+
     finally:
         if photo_path:
+            logger.info(f"Cleaning Download: downloads/ocr_temp_{file_serial}")
             clean_download(photo_path)
-            logger.info(f"Deleted temporary image file: {photo_path}")
