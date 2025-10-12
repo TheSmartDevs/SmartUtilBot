@@ -15,80 +15,23 @@ from bot.helpers.notify import Smart_Notify
 from bot.helpers.defend import SmartDefender
 from config import UPDATE_CHANNEL_URL
 from datetime import datetime
-import aiohttp
-import json
+from bot.helpers.graph import SmartGraph
 from smartbindb import SmartBinDB
 
-API_BASE = "https://api.graph.org"
-
-async def text_to_nodes(text: str):
-    paragraphs = []
-    buf = []
-    for line in text.splitlines():
-        if line.strip() == "":
-            if buf:
-                paragraphs.append(" ".join(buf).strip())
-                buf = []
-        else:
-            buf.append(line.strip())
-    if buf:
-        paragraphs.append(" ".join(buf).strip())
-    nodes = []
-    for p in paragraphs if paragraphs else [text.strip()]:
-        if p:
-            nodes.append({"tag": "p", "children": [p]})
-    return nodes
-
-async def create_account(session: aiohttp.ClientSession, short_name: str, author_name: str = "", author_url: str = ""):
-    url = f"{API_BASE}/createAccount"
-    data = {"short_name": short_name}
-    if author_name:
-        data["author_name"] = author_name
-    if author_url:
-        data["author_url"] = author_url
-    async with session.post(url, data=data) as resp:
-        LOGGER.info(f"HTTP Request: POST {url} \"HTTP/1.1 {resp.status} OK\"")
-        payload = await resp.json(content_type=None)
-        if not payload.get("ok"):
-            raise RuntimeError(f"createAccount failed: {payload.get('error')}")
-        return payload["result"]
-
-async def create_page(session: aiohttp.ClientSession, access_token: str, title: str, text: str, author_name: str = "", author_url: str = ""):
-    url = f"{API_BASE}/createPage"
-    content_nodes = await text_to_nodes(text)
-    content = json.dumps(content_nodes, ensure_ascii=False)
-    data = {
-        "access_token": access_token,
-        "title": title or "Untitled",
-        "content": content,
-    }
-    if author_name:
-        data["author_name"] = author_name
-    if author_url:
-        data["author_url"] = author_url
-    async with session.post(url, data=data) as resp:
-        LOGGER.info(f"HTTP Request: POST {url} \"HTTP/1.1 {resp.status} OK\"")
-        payload = await resp.json(content_type=None)
-        if not payload.get("ok"):
-            raise RuntimeError(f"createPage failed: {payload.get('error')}")
-        return payload["result"]
-
-TELEGRAPH_ACCESS_TOKEN = None
-TELEGRAPH_SESSION = None
+smartdb = SmartBinDB()
+smart_graph = SmartGraph()
 
 async def init_telegraph(bot: Bot):
-    global TELEGRAPH_ACCESS_TOKEN, TELEGRAPH_SESSION
-    timeout = aiohttp.ClientTimeout(total=60)
-    TELEGRAPH_SESSION = aiohttp.ClientSession(timeout=timeout)
     try:
-        acct = await create_account(TELEGRAPH_SESSION, short_name="SmartUtilBot", author_name="SmartUtilBot", author_url="https://t.me/TheSmartDev")
-        TELEGRAPH_ACCESS_TOKEN = acct.get("access_token")
-        LOGGER.info(f"Telegraph account initialized successfully with short_name: {acct.get('short_name')}")
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(smart_graph.initialize())
+        else:
+            loop.run_until_complete(smart_graph.initialize())
+        LOGGER.info("Telegraph account initialized successfully")
     except Exception as e:
         LOGGER.error(f"Failed to create or access Telegraph account: {e}")
         await Smart_Notify(bot, "bindb", e, None)
-
-smartdb = SmartBinDB()
 
 async def process_bins_to_json(api_result, bot: Bot):
     processed = []
@@ -105,10 +48,6 @@ async def process_bins_to_json(api_result, bot: Bot):
     return processed
 
 async def create_telegraph_page(content: str, part_number: int, bot: Bot) -> list:
-    global TELEGRAPH_ACCESS_TOKEN, TELEGRAPH_SESSION
-    if not TELEGRAPH_ACCESS_TOKEN or not TELEGRAPH_SESSION:
-        await Smart_Notify(bot, "bindb", "Telegraph not initialized", None)
-        return []
     try:
         current_date = datetime.now().strftime("%m-%d")
         truncated_content = content[:40000]
@@ -121,10 +60,15 @@ async def create_telegraph_page(content: str, part_number: int, bot: Bot) -> lis
         for line in lines:
             line_bytes = line.encode('utf-8', errors='ignore')
             if current_size + len(line_bytes) > max_size_bytes and page_content:
-                safe_content = page_content.replace('<', '&lt;').replace('>', '&gt;')
-                page = await create_page(TELEGRAPH_SESSION, TELEGRAPH_ACCESS_TOKEN, title=f"Smart-Tool-Bin-DB---Part-{part_count}-{current_date}", text=safe_content, author_name="ISmartCoder", author_url="https://t.me/TheSmartDev")
-                graph_url = page['url'].replace('telegra.ph', 'graph.org')
-                pages.append(graph_url)
+                page_url = await smart_graph.create_page(
+                    title=f"Smart-Tool-Bin-DB---Part-{part_count}-{current_date}",
+                    content=page_content,
+                    author_name="ISmartCoder",
+                    author_url="https://t.me/TheSmartDev"
+                )
+                if not page_url:
+                    return []
+                pages.append(page_url)
                 page_content = ""
                 current_size = 0
                 part_count += 1
@@ -132,10 +76,15 @@ async def create_telegraph_page(content: str, part_number: int, bot: Bot) -> lis
             page_content += line
             current_size += len(line_bytes)
         if page_content:
-            safe_content = page_content.replace('<', '&lt;').replace('>', '&gt;')
-            page = await create_page(TELEGRAPH_SESSION, TELEGRAPH_ACCESS_TOKEN, title=f"Smart-Tool-Bin-DB---Part-{part_count}-{current_date}", text=safe_content, author_name="TheSmartDev", author_url="https://t.me/TheSmartDevs")
-            graph_url = page['url'].replace('telegra.ph', 'graph.org')
-            pages.append(graph_url)
+            page_url = await smart_graph.create_page(
+                title=f"Smart-Tool-Bin-DB---Part-{part_count}-{current_date}",
+                content=page_content,
+                author_name="TheSmartDev",
+                author_url="https://t.me/TheSmartDevs"
+            )
+            if not page_url:
+                return []
+            pages.append(page_url)
             await asyncio.sleep(0.5)
         return pages
     except Exception as e:
@@ -152,7 +101,7 @@ def generate_message(bins, identifier):
     return message
 
 def generate_telegraph_content(bins):
-    content = f"Smart Util ⚙️ - Bin database 📋\n━━━━━━━━━━━━━━━━━━\n\n"
+    content = ""
     for bin_data in bins:
         content += (f"BIN: {bin_data['bin']}\n"
                     f"Bank: {bin_data['bank']}\n"
@@ -163,10 +112,8 @@ def generate_telegraph_content(bins):
 @new_task
 @SmartDefender
 async def bin_handler(message: Message, bot: Bot):
-    global TELEGRAPH_SESSION
-    if TELEGRAPH_SESSION is None:
-        await init_telegraph(bot)
     LOGGER.info(f"Received command: '{message.text}' from user {message.from_user.id if message.from_user else 'Unknown'} in chat {message.chat.id}")
+    await init_telegraph(bot)
     progress_message = None
     try:
         progress_message = await send_message(
@@ -219,6 +166,13 @@ async def bin_handler(message: Message, bot: Bot):
                     for i, url in enumerate(telegraph_urls, start=1):
                         buttons.button(f"Output {i}", url=url)
                 keyboard = buttons.build_menu(b_cols=2)
+            else:
+                await send_message(
+                    chat_id=message.chat.id,
+                    text="<b>Sorry Failed To Upload On Telegraph</b>",
+                    parse_mode=ParseMode.HTML
+                )
+                return
         await send_message(
             chat_id=message.chat.id,
             text=message_text,
@@ -257,10 +211,8 @@ async def bin_handler(message: Message, bot: Bot):
 @new_task
 @SmartDefender
 async def bindb_handler(message: Message, bot: Bot):
-    global TELEGRAPH_SESSION
-    if TELEGRAPH_SESSION is None:
-        await init_telegraph(bot)
     LOGGER.info(f"Received command: '{message.text}' from user {message.from_user.id if message.from_user else 'Unknown'} in chat {message.chat.id}")
+    await init_telegraph(bot)
     progress_message = None
     try:
         progress_message = await send_message(
@@ -326,6 +278,13 @@ async def bindb_handler(message: Message, bot: Bot):
                     for i, url in enumerate(telegraph_urls, start=1):
                         buttons.button(f"Output {i}", url=url)
                 keyboard = buttons.build_menu(b_cols=2)
+            else:
+                await send_message(
+                    chat_id=message.chat.id,
+                    text="<b>Sorry Failed To Upload On Telegraph</b>",
+                    parse_mode=ParseMode.HTML
+                )
+                return
         await send_message(
             chat_id=message.chat.id,
             text=message_text,
@@ -364,10 +323,8 @@ async def bindb_handler(message: Message, bot: Bot):
 @new_task
 @SmartDefender
 async def binbank_handler(message: Message, bot: Bot):
-    global TELEGRAPH_SESSION
-    if TELEGRAPH_SESSION is None:
-        await init_telegraph(bot)
     LOGGER.info(f"Received command: '{message.text}' from user {message.from_user.id if message.from_user else 'Unknown'} in chat {message.chat.id}")
+    await init_telegraph(bot)
     progress_message = None
     try:
         progress_message = await send_message(
@@ -420,6 +377,13 @@ async def binbank_handler(message: Message, bot: Bot):
                     for i, url in enumerate(telegraph_urls, start=1):
                         buttons.button(f"Output {i}", url=url)
                 keyboard = buttons.build_menu(b_cols=2)
+            else:
+                await send_message(
+                    chat_id=message.chat.id,
+                    text="<b>Sorry Failed To Upload On Telegraph</b>",
+                    parse_mode=ParseMode.HTML
+                )
+                return
         await send_message(
             chat_id=message.chat.id,
             text=message_text,
