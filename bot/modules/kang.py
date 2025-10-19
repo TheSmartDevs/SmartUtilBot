@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import os
 import re
 import uuid
@@ -11,7 +8,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, BufferedInputFile, FSInputFile, InputSticker
 from aiogram.enums import ParseMode, StickerFormat, StickerType
 from aiogram.exceptions import TelegramBadRequest
-from bot import dp
+from bot import dp, SmartPyro
 from bot.helpers.utils import new_task, clean_download
 from bot.helpers.botutils import send_message, delete_messages, get_args
 from bot.helpers.commands import BotCommands
@@ -19,6 +16,10 @@ from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.buttons import SmartButtons
 from bot.helpers.defend import SmartDefender
+from pyrogram.raw.functions.messages import GetStickerSet, SendMedia
+from pyrogram.raw.functions.stickers import AddStickerToSet, CreateStickerSet
+from pyrogram.raw.types import DocumentAttributeFilename, InputDocument, InputMediaUploadedDocument, InputStickerSetItem, InputStickerSetShortName
+from pyrogram.errors import StickersetInvalid
 
 FILE_LOCK = asyncio.Lock()
 
@@ -164,12 +165,12 @@ async def kang_handler(message: Message, bot: Bot):
             nonlocal packnum, packname
             while packnum <= 100:
                 try:
-                    stickerset = await bot.get_sticker_set(name=packname)
-                    if len(stickerset.stickers) < max_stickers:
+                    stickerset = await SmartPyro.invoke(GetStickerSet(stickerset=InputStickerSetShortName(short_name=packname), hash=0))
+                    if stickerset.set.count < max_stickers:
                         return True
                     packnum += 1
                     packname = f"a{packnum}_{user_id}_by_{(await bot.get_me()).username}"
-                except TelegramBadRequest:
+                except StickersetInvalid:
                     return False
             return False
 
@@ -325,41 +326,64 @@ async def kang_handler(message: Message, bot: Bot):
             elif sticker_format == "animated":
                 final_format = StickerFormat.ANIMATED
 
-            with open(final_file, 'rb') as f:
-                file_data = f.read()
-
-            input_sticker = InputSticker(
-                sticker=BufferedInputFile(
-                    file_data,
-                    filename=os.path.basename(final_file)
-                ),
-                format=final_format,
-                emoji_list=[sticker_emoji]
-            )
-
-            try:
-                await bot.add_sticker_to_set(
-                    user_id=user_id,
-                    name=packname,
-                    sticker=input_sticker
-                )
-                success = True
-            except TelegramBadRequest:
-                try:
-                    await bot.create_new_sticker_set(
-                        user_id=user_id,
-                        name=packname,
-                        title=pack_title,
-                        stickers=[input_sticker],
-                        sticker_type=StickerType.REGULAR
+            async def upload_and_add_sticker():
+                file = await SmartPyro.save_file(final_file)
+                media = await SmartPyro.invoke(
+                    SendMedia(
+                        peer=(await SmartPyro.resolve_peer(chat_id)),
+                        media=InputMediaUploadedDocument(
+                            file=file,
+                            mime_type=SmartPyro.guess_mime_type(final_file),
+                            attributes=[DocumentAttributeFilename(file_name=os.path.basename(final_file))],
+                        ),
+                        message=f"#Sticker kang by UserID -> {user_id}",
+                        random_id=SmartPyro.rnd_id(),
                     )
-                    success = True
+                )
+                return media.updates[-1].message
+
+            async def add_to_sticker_set(stkr_file):
+                try:
+                    await SmartPyro.invoke(
+                        AddStickerToSet(
+                            stickerset=InputStickerSetShortName(short_name=packname),
+                            sticker=InputStickerSetItem(
+                                document=InputDocument(
+                                    id=stkr_file.id,
+                                    access_hash=stkr_file.access_hash,
+                                    file_reference=stkr_file.file_reference,
+                                ),
+                                emoji=sticker_emoji,
+                            ),
+                        )
+                    )
+                    return True
+                except StickersetInvalid:
+                    await SmartPyro.invoke(
+                        CreateStickerSet(
+                            user_id=await SmartPyro.resolve_peer(user_id),
+                            title=pack_title,
+                            short_name=packname,
+                            stickers=[
+                                InputStickerSetItem(
+                                    document=InputDocument(
+                                        id=stkr_file.id,
+                                        access_hash=stkr_file.access_hash,
+                                        file_reference=stkr_file.file_reference,
+                                    ),
+                                    emoji=sticker_emoji,
+                                )
+                            ],
+                        )
+                    )
+                    return True
                 except Exception as e:
-                    LOGGER.error(f"Error creating sticker set for user {user_id}: {str(e)}")
-                    success = False
-            except Exception as e:
-                LOGGER.error(f"Error adding sticker for user {user_id}: {str(e)}")
-                success = False
+                    LOGGER.error(f"Error adding sticker: {str(e)}")
+                    return False
+
+            msg_ = await upload_and_add_sticker()
+            stkr_file = msg_.media.document
+            success = await add_to_sticker_set(stkr_file)
 
             if success:
                 buttons = SmartButtons()
@@ -371,6 +395,7 @@ async def kang_handler(message: Message, bot: Bot):
                     disable_web_page_preview=True
                 )
                 LOGGER.info(f"Successfully kanged sticker for user: {user_id}")
+                await SmartPyro.delete_messages(chat_id=chat_id, message_ids=msg_.id, revoke=True)
             else:
                 await temp_message.edit_text(
                     text="<b>❌ Failed To Kang The Sticker</b>",
@@ -420,5 +445,4 @@ async def kang_handler(message: Message, bot: Bot):
             )
         LOGGER.info(f"Sent error message to chat {chat_id}")
         for file in temp_files:
-
             clean_download(file)
