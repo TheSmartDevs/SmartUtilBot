@@ -151,14 +151,14 @@ async def handle_file_download(message: Message, bot: Bot):
             smart_buttons.button("🖥️ Stream", url=stream_link)
         keyboard = smart_buttons.build_menu(b_cols=2)
         response = (
-            f"✨ Your Links are Ready! ✨\n\n"
-            f"{file_name}\n\n"
-            f"📂 File Size: {await format_file_size(file_size)}\n\n"
-            f"🚀 Download Link: {download_link}\n\n"
+            f"<b>✨ Your Links are Ready! ✨</b>\n\n"
+            f"<code>{file_name}</code>\n\n"
+            f"<b>📂 File Size:</b> <code>{await format_file_size(file_size)}</code>\n\n"
+            f"<b>🚀 Download Link:</b> <code>{download_link}</code>\n\n"
         )
         if stream_link:
-            response += f"🖥️ Stream Link: {stream_link}\n\n"
-        response += "⌛️ Note: Links remain active while the bot is running and the file is accessible."
+            response += f"<b>🖥️ Stream Link:</b> <code>{stream_link}</code>\n\n"
+        response += "<b>⌛️ Note: </b>\n<blockquote>Links remain active while the bot is running and the file is accessible.</blockquote>"
         await processing_msg.edit_text(
             text=response,
             parse_mode=ParseMode.HTML,
