@@ -1,6 +1,6 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
+#Copyright @ISmartCoder
+#SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
+#Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 from aiogram.types import InlineKeyboardMarkup
 from bot.helpers.buttons import SmartButtons
 from config import UPDATE_CHANNEL_URL
@@ -550,7 +550,7 @@ responses = {
     ),
     "about_me": (
         "<b>Name:</b> Smart Util\n"
-        "<b>Version:</b> v32.0 (Beta) 🛠\n\n"
+        "<b>Version:</b> v60.0 (Beta) 🛠\n\n"
         "<b>Development Team:</b>\n"
         "- <b>Creator:</b> <a href='https://t.me/ISmartCoder'>Abir Arafat Chawdhury 👨‍💻</a>\n"
         "- <b>Contributor:</b> <a href='https://t.me/nkka404'>Nyein Ko Ko Aung 🤝</a>\n"
@@ -580,4 +580,5 @@ responses = {
         "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Now</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
         {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
     )
+
 }
