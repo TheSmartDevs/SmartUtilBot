@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://t.me/ISmartToolBot"><img src="https://img.shields.io/badge/Bot-@ISmartToolBot-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white"></a>
+  <a href="https://t.me/SmartTTLBot"><img src="https://img.shields.io/badge/Bot-@ISmartToolBot-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white"></a>
   <a href="https://t.me/TheSmartDev"><img src="https://img.shields.io/badge/Channel-@TheSmartDev-FF6B6B?style=for-the-badge&logo=telegram&logoColor=white"></a>
   <a href="https://t.me/ISmartCoder"><img src="https://img.shields.io/badge/Contact-@ISmartCoder-4ECDC4?style=for-the-badge&logo=telegram&logoColor=white"></a>
 </p>
