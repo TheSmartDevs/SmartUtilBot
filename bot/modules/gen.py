@@ -16,10 +16,8 @@ from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.utils import new_task, clean_download
 from bot.helpers.defend import SmartDefender
-from smartbindb import SmartBinDB
+from bot.helpers.bindb import smartdb
 from config import CC_GEN_LIMIT, MULTI_CCGEN_LIMIT
-
-smartdb = SmartBinDB()
 
 def is_amex_bin(bin_str):
     clean_bin = bin_str.replace('x', '').replace('X', '')
@@ -561,7 +559,7 @@ async def regenerate_callback(callback_query: CallbackQuery, bot: Bot):
             is_amex = is_amex_bin(bin)
             if is_amex and len(cvv) != 4:
                 await callback_query.answer("Invalid CVV format. CVV must be 4 digits for AMEX ❌", show_alert=True)
-                return
+            return
         clean_bin_for_api = bin[:6]
         bin_info = await get_bin_info(clean_bin_for_api, bot, callback_query.message)
         if not bin_info:
