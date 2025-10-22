@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-# SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-# Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 from aiogram import Bot
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -10,17 +7,13 @@ from bot import dp
 from bot.helpers.utils import new_task, clean_download
 from bot.helpers.botutils import send_message, delete_messages, get_args
 from bot.helpers.commands import BotCommands
-from bot.helpers.buttons import SmartButtons
 from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.defend import SmartDefender
-from config import UPDATE_CHANNEL_URL
-from smartbindb import SmartBinDB
+from bot.helpers.bindb import smartdb
 import pycountry
 import os
 import asyncio
-
-smartdb = SmartBinDB()
 
 async def get_bin_info(bin: str, bot: Bot, message: Message):
     try:
@@ -141,14 +134,9 @@ async def bin_handler(message: Message, bot: Bot):
             f"<b>🔍 Smart Bin Checker → Activated ✅</b>"
         )
 
-        buttons = SmartButtons()
-        buttons.button(text="Join For Updates", url=UPDATE_CHANNEL_URL)
-        await delete_messages(message.chat.id, progress_message.message_id)
-        await send_message(
-            chat_id=message.chat.id,
+        await progress_message.edit_text(
             text=response_text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=buttons.build_menu(b_cols=1)
+            parse_mode=ParseMode.HTML
         )
         LOGGER.info(f"Successfully sent BIN details for {len(bins)} BINs to chat {message.chat.id}")
 
