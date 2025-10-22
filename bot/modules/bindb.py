@@ -1,24 +1,22 @@
-import asyncio
-import pycountry
 from aiogram import Bot
 from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from bot import dp, SmartAIO
-from bot.helpers.botutils import send_message, delete_messages
-from bot.helpers.buttons import SmartButtons
+from bot.helpers.utils import new_task
+from bot.helpers.botutils import send_message
 from bot.helpers.commands import BotCommands
 from bot.helpers.logger import LOGGER
-from bot.helpers.utils import new_task
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.defend import SmartDefender
-from config import UPDATE_CHANNEL_URL
-from datetime import datetime
+from bot.helpers.buttons import SmartButtons
 from bot.helpers.graph import SmartGraph
-from smartbindb import SmartBinDB
+from bot.helpers.bindb import smartdb
+from datetime import datetime
+import asyncio
+import pycountry
 
-smartdb = SmartBinDB()
 smart_graph = SmartGraph()
 
 async def init_telegraph(bot: Bot):
@@ -27,10 +25,10 @@ async def init_telegraph(bot: Bot):
         if loop.is_running():
             loop.create_task(smart_graph.initialize())
         else:
-            loop.run_until_complete(smart_graph.initialize())
+            await smart_graph.initialize()
         LOGGER.info("Telegraph account initialized successfully")
     except Exception as e:
-        LOGGER.error(f"Failed to create or access Telegraph account: {e}")
+        LOGGER.error(f"Failed to create or access Telegraph account: {str(e)}")
         await Smart_Notify(bot, "bindb", e, None)
 
 async def process_bins_to_json(api_result, bot: Bot):
@@ -88,7 +86,7 @@ async def create_telegraph_page(content: str, part_number: int, bot: Bot) -> lis
             await asyncio.sleep(0.5)
         return pages
     except Exception as e:
-        LOGGER.error(f"Failed to create Telegraph page: {e}")
+        LOGGER.error(f"Failed to create Telegraph page: {str(e)}")
         await Smart_Notify(bot, "bindb", e, None)
         return []
 
@@ -143,11 +141,9 @@ async def bin_handler(message: Message, bot: Bot):
                 parse_mode=ParseMode.HTML
             )
         bin_result = await smartdb.get_bin_info(bin_number)
-        await delete_messages(message.chat.id, progress_message.message_id)
         processed_bins = await process_bins_to_json(bin_result, bot)
         if not processed_bins:
-            await send_message(
-                chat_id=message.chat.id,
+            await progress_message.edit_text(
                 text="<b>Sorry, BIN Not Found ❌</b>",
                 parse_mode=ParseMode.HTML
             )
@@ -167,14 +163,8 @@ async def bin_handler(message: Message, bot: Bot):
                         buttons.button(f"Output {i}", url=url)
                 keyboard = buttons.build_menu(b_cols=2)
             else:
-                await send_message(
-                    chat_id=message.chat.id,
-                    text="<b>Sorry Failed To Upload On Telegraph</b>",
-                    parse_mode=ParseMode.HTML
-                )
-                return
-        await send_message(
-            chat_id=message.chat.id,
+                message_text += "\n<b>Sorry, failed to upload additional results to Telegraph ❌</b>"
+        await progress_message.edit_text(
             text=message_text,
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard
@@ -255,11 +245,9 @@ async def bindb_handler(message: Message, bot: Bot):
                 parse_mode=ParseMode.HTML
             )
         bins_result = await smartdb.get_bins_by_country(country_code, limit=8000)
-        await delete_messages(message.chat.id, progress_message.message_id)
         processed_bins = await process_bins_to_json(bins_result, bot)
         if not processed_bins:
-            await send_message(
-                chat_id=message.chat.id,
+            await progress_message.edit_text(
                 text="<b>Sorry No Bins Found ❌</b>",
                 parse_mode=ParseMode.HTML
             )
@@ -279,14 +267,8 @@ async def bindb_handler(message: Message, bot: Bot):
                         buttons.button(f"Output {i}", url=url)
                 keyboard = buttons.build_menu(b_cols=2)
             else:
-                await send_message(
-                    chat_id=message.chat.id,
-                    text="<b>Sorry Failed To Upload On Telegraph</b>",
-                    parse_mode=ParseMode.HTML
-                )
-                return
-        await send_message(
-            chat_id=message.chat.id,
+                message_text += "\n<b>Sorry, failed to upload additional results to Telegraph ❌</b>"
+        await progress_message.edit_text(
             text=message_text,
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard
@@ -354,11 +336,9 @@ async def binbank_handler(message: Message, bot: Bot):
                 parse_mode=ParseMode.HTML
             )
         bins_result = await smartdb.get_bins_by_bank(bank_name, limit=8000)
-        await delete_messages(message.chat.id, progress_message.message_id)
         processed_bins = await process_bins_to_json(bins_result, bot)
         if not processed_bins:
-            await send_message(
-                chat_id=message.chat.id,
+            await progress_message.edit_text(
                 text="<b>Sorry No Bins Found ❌</b>",
                 parse_mode=ParseMode.HTML
             )
@@ -378,14 +358,8 @@ async def binbank_handler(message: Message, bot: Bot):
                         buttons.button(f"Output {i}", url=url)
                 keyboard = buttons.build_menu(b_cols=2)
             else:
-                await send_message(
-                    chat_id=message.chat.id,
-                    text="<b>Sorry Failed To Upload On Telegraph</b>",
-                    parse_mode=ParseMode.HTML
-                )
-                return
-        await send_message(
-            chat_id=message.chat.id,
+                message_text += "\n<b>Sorry, failed to upload additional results to Telegraph ❌</b>"
+        await progress_message.edit_text(
             text=message_text,
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard
