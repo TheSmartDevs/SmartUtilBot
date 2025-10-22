@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![SmartUtilBot Logo](https://readme-typing-svg.herokuapp.com?font=Orbitron&size=40&color=%2379C83D&center=true&vCenter=true&width=600&lines=SmartUtilBot;The+Ultimate+Telegram+Toolkit;Version+v32.0+(Beta))
+![SmartUtilBot Logo](https://readme-typing-svg.herokuapp.com?font=Orbitron&size=40&color=%2379C83D&center=true&vCenter=true&width=600&lines=SmartUtilBot;The+Ultimate+Telegram+Toolkit;Version+v60.0+(Beta))
 
 <p align="center">
   <img src="https://img.shields.io/badge/Smart%20Util-v60.0%20(Beta)-brightgreen?style=for-the-badge&logo=telegram&logoColor=white" alt="Version">
