@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-# SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-# Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 from aiogram import Bot
 from aiogram.filters import Command, BaseFilter
 from aiogram.types import Message, CallbackQuery
@@ -14,12 +11,10 @@ from bot.helpers.buttons import SmartButtons
 from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.defend import SmartDefender
-from smartbindb import SmartBinDB
+from bot.helpers.bindb import smartdb
 import pycountry
 import random
 import asyncio
-
-smartdb = SmartBinDB()
 
 async def get_bin_info(bin: str, bot: Bot, message: Message):
     try:
