@@ -1,5 +1,4 @@
 import asyncio
-import secrets
 import urllib.parse
 from datetime import datetime
 from mimetypes import guess_type
@@ -23,7 +22,21 @@ import os
 
 logger = LOGGER
 
-BASE_URL = os.getenv("BASE_URL", "http://147.93.19.133:8000")
+BASE_URL = os.getenv("BASE_URL", "http://161.97.132.210:5000")
+
+async def get_telegram_file_id(message: Message):
+    if message.document:
+        return message.document.file_id
+    elif message.video:
+        return message.video.file_id
+    elif message.audio:
+        return message.audio.file_id
+    elif message.photo:
+        return message.photo[-1].file_id
+    elif message.video_note:
+        return message.video_note.file_id
+    else:
+        return None
 
 async def get_file_properties(message: Message):
     file_name = None
@@ -87,7 +100,6 @@ async def format_file_size(file_size: int):
     return f"{size:.2f} {unit}"
 
 async def handle_file_download(message: Message, bot: Bot):
-    user_id = message.from_user.id if message.from_user else None
     if not message.reply_to_message:
         await send_message(
             chat_id=message.chat.id,
@@ -116,11 +128,19 @@ async def handle_file_download(message: Message, bot: Bot):
                 parse_mode=ParseMode.HTML
             )
             return
-        code = f"{secrets.token_urlsafe(16)}-{user_id}"
+        bot_me = await bot.get_me()
+        bot_user_id = bot_me.id
+        telegram_file_id = await get_telegram_file_id(reply_message)
+        if not telegram_file_id:
+            await processing_msg.edit_text(
+                "<b>Error: Could not get file ID</b>",
+                parse_mode=ParseMode.HTML
+            )
+            return
         file_name, file_size, mime_type = await get_file_properties(reply_message)
-        file_id = None
+        code = f"{telegram_file_id}-{bot_user_id}"
+        message_id = None
         if message.chat.id == LOG_CHANNEL_ID:
-            file_id = reply_message.message_id
             sent = await SmartPyro.copy_message(
                 chat_id=LOG_CHANNEL_ID,
                 from_chat_id=LOG_CHANNEL_ID,
@@ -128,23 +148,23 @@ async def handle_file_download(message: Message, bot: Bot):
                 caption=code,
                 parse_mode=SmartParseMode.HTML
             )
-            file_id = sent.id
+            message_id = sent.id
         else:
             sent = await reply_message.forward(LOG_CHANNEL_ID)
-            file_id = sent.message_id
+            temp_id = sent.message_id
             sent = await SmartPyro.copy_message(
                 chat_id=LOG_CHANNEL_ID,
                 from_chat_id=LOG_CHANNEL_ID,
-                message_id=file_id,
+                message_id=temp_id,
                 caption=code,
                 parse_mode=SmartParseMode.HTML
             )
-            file_id = sent.id
+            message_id = sent.id
         quoted_code = urllib.parse.quote(code)
         base_url = BASE_URL.rstrip('/')
-        download_link = f"{base_url}/dl/{file_id}?code={quoted_code}"
+        download_link = f"{base_url}/dl/{message_id}?code={quoted_code}"
         is_video = mime_type.startswith('video') or reply_message.video or reply_message.video_note
-        stream_link = f"{base_url}/dl/{file_id}?code={quoted_code}=stream" if is_video else None
+        stream_link = f"{base_url}/dl/{message_id}?code={quoted_code}=stream" if is_video else None
         smart_buttons = SmartButtons()
         smart_buttons.button("🚀 Download", url=download_link)
         if stream_link:
@@ -165,9 +185,9 @@ async def handle_file_download(message: Message, bot: Bot):
             reply_markup=keyboard,
             disable_web_page_preview=True
         )
-        logger.info(f"Generated links for file_id: {file_id}, download: {download_link}, stream: {stream_link}")
+        logger.info(f"Generated links for message_id: {message_id}, telegram_file_id: {telegram_file_id}, download: {download_link}, stream: {stream_link}")
     except Exception as e:
-        logger.error(f"Error generating links for file_id: {file_id if 'file_id' in locals() else 'unknown'}, error: {str(e)}")
+        logger.error(f"Error generating links, error: {str(e)}")
         await Smart_Notify(bot, f"{BotCommands}fdl", e, processing_msg)
         await processing_msg.edit_text(
             f"<b>Error: Failed to generate link - {str(e)}</b>",
