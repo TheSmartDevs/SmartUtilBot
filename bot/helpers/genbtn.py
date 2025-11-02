@@ -1,6 +1,3 @@
-#Copyright @ISmartCoder
-#SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 from aiogram.types import InlineKeyboardMarkup
 from bot.helpers.buttons import SmartButtons
 from config import UPDATE_CHANNEL_URL
@@ -45,6 +42,7 @@ third_menu_keyboard.button(text="Web Capture", callback_data="web_capture")
 third_menu_keyboard.button(text="Weather", callback_data="weather")
 third_menu_keyboard.button(text="Yt Tools", callback_data="yt_tools")
 third_menu_keyboard.button(text="Translate", callback_data="translate")
+third_menu_keyboard.button(text="QR Code", callback_data="qr_code")  
 third_menu_keyboard.button(text="Previous ⬅️", callback_data="previous_2")
 third_menu_keyboard.button(text="Close ❌", callback_data="close")
 third_menu_keyboard = third_menu_keyboard.build_menu(b_cols=2, h_cols=1, f_cols=2)
@@ -547,6 +545,20 @@ responses = {
         "1️⃣ Ensure you provide a valid YouTube video URL with the commands.\n\n"
         "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Now</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
         {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
+    ),
+    "qr_code": (
+    "<b>📱 QR Code Generator</b>\n"
+    "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+    "<b>📋 USAGE:</b>\n"
+    "Generate high-quality QR codes with customizable options.\n\n"
+    "➢ <b>/qr</b> — Advanced mode with settings\n\n"
+    "<b>⚙️ Features:</b>\n"
+    "• Size selection: Small / Medium / Large / Extra Large\n"
+    "• Styles: Classic, Gradient, Blue, Dark, Green\n"
+    "• Add custom logo at center (Brand support)\n\n"
+    "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+    "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Channel</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
+    {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
     ),
     "about_me": (
         "<b>Name:</b> Smart Util\n"
