@@ -16,9 +16,9 @@ from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.guard import admin_only
 from bot.core.mongo import SmartUsers
-from bot.modules.string import session_data
 from config import UPDATE_CHANNEL_URL
 import re
+
 
 async def update_user_activity(user_id: int, chat_id: int = None, is_group: bool = False):
     try:
@@ -55,6 +55,7 @@ async def update_user_activity(user_id: int, chat_id: int = None, is_group: bool
     except Exception as e:
         LOGGER.error(f"Error updating user activity for user_id {user_id}, chat_id {chat_id}: {str(e)}")
 
+
 @dp.message(Command(commands=["broadcast", "send"], prefix=BotCommands))
 @admin_only
 async def broadcast_handler(message: Message, bot: Bot):
@@ -87,6 +88,7 @@ async def broadcast_handler(message: Message, bot: Bot):
             parse_mode=SmartParseMode.HTML
         )
 
+
 async def process_broadcast(client: Client, content: Message, is_broadcast: bool, chat_id: int, bot: Bot):
     try:
         LOGGER.info(f"Processing {'broadcast' if is_broadcast else 'forward'}")
@@ -110,6 +112,7 @@ async def process_broadcast(client: Client, content: Message, is_broadcast: bool
         keyboard = PyrogramInlineKeyboardMarkup(pyrogram_buttons) if pyrogram_buttons else None
         all_chat_ids = user_ids + group_ids
         LOGGER.debug(f"Starting broadcast to {len(all_chat_ids)} chats")
+        
         async def send_to_chat(target_chat_id: int):
             try:
                 if content.text:
@@ -156,6 +159,7 @@ async def process_broadcast(client: Client, content: Message, is_broadcast: bool
             except Exception as e:
                 LOGGER.error(f"Error sending to chat_id {target_chat_id}: {str(e)}")
                 return ("user" if target_chat_id in user_ids else "group", "blocked" if target_chat_id in user_ids else "failed")
+        
         batch_size = 50
         for i in range(0, len(all_chat_ids), batch_size):
             batch_ids = all_chat_ids[i:i + batch_size]
@@ -173,6 +177,7 @@ async def process_broadcast(client: Client, content: Message, is_broadcast: bool
                             successful_groups += 1
                         elif status == "failed":
                             failed_groups += 1
+        
         time_diff = (datetime.now() - start_time).seconds
         await processing_msg.delete()
         total_chats = successful_users + successful_groups
@@ -204,6 +209,7 @@ async def process_broadcast(client: Client, content: Message, is_broadcast: bool
         await Smart_Notify(bot, "process_broadcast", e)
         LOGGER.error(f"Error in {'broadcast' if is_broadcast else 'forward'}: {str(e)}")
         await send_message(chat_id, "<b>Sorry Broadcast Send Failed ❌</b>", parse_mode=SmartParseMode.HTML)
+
 
 @dp.message(Command(commands=["stats", "report", "status"], prefix=BotCommands))
 @admin_only
@@ -246,6 +252,7 @@ async def stats_handler(message: Message, bot: Bot):
             parse_mode=SmartParseMode.HTML
         )
 
+
 async def group_added_handler(message: Message, bot: Bot):
     try:
         bot_info = await bot.get_me()
@@ -264,6 +271,7 @@ async def group_added_handler(message: Message, bot: Bot):
         await Smart_Notify(bot, "group_added_handler", e, message)
         LOGGER.error(f"Error in group_added_handler for chat_id {message.chat.id}: {str(e)}")
 
+
 @dp.chat_member(ChatMemberUpdatedFilter(member_status_changed=["member", "administrator", "kicked", "left"]))
 async def group_removed_handler(update: ChatMemberUpdated, bot: Bot):
     try:
@@ -275,15 +283,3 @@ async def group_removed_handler(update: ChatMemberUpdated, bot: Bot):
     except Exception as e:
         await Smart_Notify(bot, "group_removed_handler", e)
         LOGGER.error(f"Error in group_removed_handler for chat_id {update.chat.id}: {str(e)}")
-
-@dp.message(lambda message: message.chat.type in [ChatType.PRIVATE, ChatType.GROUP, ChatType.SUPERGROUP] and not message.from_user.is_bot and message.text and not message.text.startswith(tuple(BotCommands)) and message.chat.id not in session_data)
-async def update_user_activity_handler(message: Message, bot: Bot):
-    try:
-        user_id = message.from_user.id
-        chat_id = message.chat.id
-        is_group = message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]
-        await update_user_activity(user_id, chat_id, is_group)
-        LOGGER.debug(f"Activity updated for user {user_id} in chat {chat_id} (is_group: {is_group})")
-    except Exception as e:
-        await Smart_Notify(bot, "update_user_activity_handler", e, message)
-        LOGGER.error(f"Error in update_user_activity_handler for message_id {getattr(message, 'message_id', 'unknown')}: {str(e)}")
