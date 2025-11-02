@@ -25,4 +25,4 @@ speedtest-cli
 lxml
 smartfaker
 smartbindb
-
+qrcode[pil]
