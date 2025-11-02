@@ -26,3 +26,5 @@ lxml
 smartfaker
 smartbindb
 qrcode[pil]
+reportlab
+pypdf
