@@ -21,28 +21,30 @@ main_menu_keyboard = main_menu_keyboard.build_menu(b_cols=2, h_cols=1, f_cols=2)
 second_menu_keyboard = SmartButtons()
 second_menu_keyboard.button(text="File To Link", callback_data="file_to_link")
 second_menu_keyboard.button(text="Github Utils", callback_data="github")
+second_menu_keyboard.button(text="Image To PDF", callback_data="image_to_pdf")
 second_menu_keyboard.button(text="Info", callback_data="info")
 second_menu_keyboard.button(text="Network Tools", callback_data="network_tools")
+second_menu_keyboard.button(text="Number Lookup", callback_data="number_lookup")
+second_menu_keyboard.button(text="QR Code", callback_data="qr_code")
+second_menu_keyboard.button(text="URL Shortner", callback_data="url_shortner")
 second_menu_keyboard.button(text="Random Address", callback_data="random_address")
 second_menu_keyboard.button(text="String Session", callback_data="string_session")
-second_menu_keyboard.button(text="Stripe Keys", callback_data="stripe_keys")
-second_menu_keyboard.button(text="Sticker", callback_data="sticker")
-second_menu_keyboard.button(text="Time Date", callback_data="time_date")
-second_menu_keyboard.button(text="Txt Spilt", callback_data="text_split")
 second_menu_keyboard.button(text="Previous ⬅️", callback_data="previous_1")
 second_menu_keyboard.button(text="Next ➡️", callback_data="next_2")
 second_menu_keyboard.button(text="Close ❌", callback_data="close")
 second_menu_keyboard = second_menu_keyboard.build_menu(b_cols=2, h_cols=1, f_cols=3)
 
 third_menu_keyboard = SmartButtons()
+third_menu_keyboard.button(text="Stripe Keys", callback_data="stripe_keys")
+third_menu_keyboard.button(text="Sticker", callback_data="sticker")
+third_menu_keyboard.button(text="Time Date", callback_data="time_date")
+third_menu_keyboard.button(text="Text Spilt", callback_data="text_split")
+third_menu_keyboard.button(text="Translate", callback_data="translate")
 third_menu_keyboard.button(text="Temp Mail", callback_data="tempmail")
 third_menu_keyboard.button(text="Text OCR", callback_data="text_ocr")
 third_menu_keyboard.button(text="User Export", callback_data="bot_users_export")
 third_menu_keyboard.button(text="Web Capture", callback_data="web_capture")
-third_menu_keyboard.button(text="Weather", callback_data="weather")
 third_menu_keyboard.button(text="Yt Tools", callback_data="yt_tools")
-third_menu_keyboard.button(text="Translate", callback_data="translate")
-third_menu_keyboard.button(text="QR Code", callback_data="qr_code")  
 third_menu_keyboard.button(text="Previous ⬅️", callback_data="previous_2")
 third_menu_keyboard.button(text="Close ❌", callback_data="close")
 third_menu_keyboard = third_menu_keyboard.build_menu(b_cols=2, h_cols=1, f_cols=2)
@@ -388,6 +390,40 @@ responses = {
         "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Now</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
         {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
     ),
+    "image_to_pdf": (
+    "<b>📄 Image to PDF Maker</b>\n"
+    "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+    "<b>📋 USAGE:</b>\n"
+    "Easily convert multiple images into a single professional PDF document.\n\n"
+    "➢ <b>/pdf [Title]</b> - Start a new PDF project\n\n"
+    "<b>⚙️ Features:</b>\n"
+    "• Upload up to 50 images (photos or documents)\n"
+    "• Add optional cover page and title\n"
+    "• Choose page size: A4 / Auto-fit\n"
+    "• High-quality output, fast generation\n\n"
+    "<b>⚠️ Notes:</b>\n"
+    "• Works only in private chat\n"
+    "• Supported: albums, single images, and document-mode images\n"
+    "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+    "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Now</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
+    {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
+    ),
+    "number_lookup": (
+    "<b>📱 Number Info Lookup</b>\n"
+    "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+    "<b>📋 USAGE:</b>\n"
+    "Get information about any phone number registered name.\n\n"
+    "➢ <b>/ph [Number]</b> - Lookup phone number details\n"
+    "Example: <code>/ph 8801912345678</code>\n"
+    "Example: <code>/ph +8801912345678</code>\n\n"
+    "<b>⚠️ IMPORTANT NOTES:</b>\n"
+    "1️⃣ Use valid phone numbers with country code\n"
+    "2️⃣ Name availability depends on Eyecon database\n"
+    "3️⃣ Complies with Telegram ToS - no illegal activity\n"
+    "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+    "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Now</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
+    {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
+    ),
     "tempmail": (
         "<b>📧 Temporary Mail Utils ⚙️</b>\n"
         "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
@@ -556,6 +592,22 @@ responses = {
     "• Size selection: Small / Medium / Large / Extra Large\n"
     "• Styles: Classic, Gradient, Blue, Dark, Green\n"
     "• Add custom logo at center (Brand support)\n\n"
+    "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+    "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Channel</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
+    {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
+    ),
+    "url_shortner": (
+    "<b>🔗 URL Shortener</b>\n"
+    "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+    "<b>📋 USAGE:</b>\n"
+    "Shorten long URLs and track click statistics.\n\n"
+    "➢ <b>/short</b> &lt;url&gt; — Quick shorten\n"
+    "➢ <b>/short</b> — Advanced mode with custom slug\n\n"
+    "<b>⚙️ Features:</b>\n"
+    "• Auto-generated or custom slug\n"
+    "• Real-time click statistics\n"
+    "• Delete URL management\n"
+    "• Track clicks and creation date\n\n"
     "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
     "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Channel</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
     {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
