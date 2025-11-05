@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import os
 import time
 import subprocess
@@ -165,9 +162,9 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
             back_button.button(text="⬅️ Back", callback_data="start_message")
         elif call.data in ["ai_tools", "credit_cards", "crypto", "converter", "coupons", "decoders", "downloaders", "domain_check", "education_utils", "rembg"]:
             back_button.button(text="Back", callback_data="main_menu")
-        elif call.data in ["file_to_link", "github", "info", "network_tools", "random_address", "string_session", "stripe_keys", "sticker", "time_date", "text_split"]:
+        elif call.data in ["file_to_link", "github", "image_to_pdf", "info", "network_tools", "number_lookup", "qr_code", "url_shortner", "random_address", "string_session"]:
             back_button.button(text="Back", callback_data="second_menu")
-        elif call.data in ["tempmail", "text_ocr", "bot_users_export", "web_capture", "weather", "yt_tools", "translate"]:
+        elif call.data in ["stripe_keys", "sticker", "time_date", "text_split", "translate", "tempmail", "text_ocr", "bot_users_export", "web_capture", "yt_tools"]:
             back_button.button(text="Back", callback_data="third_menu")
         else:
             back_button.button(text="Back", callback_data="main_menu")
