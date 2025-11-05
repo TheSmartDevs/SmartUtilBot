@@ -22,6 +22,7 @@ psutil
 pydub
 moviepy
 speedtest-cli
+py-yt-search
 lxml
 smartfaker
 smartbindb
