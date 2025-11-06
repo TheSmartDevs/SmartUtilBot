@@ -438,7 +438,7 @@ async def handle_media_request(message: Message, bot: Bot, query: str, is_audio:
     await asyncio.get_event_loop().run_in_executor(executor, clean_download, str(DLConfig.TEMP_DIR / result['temp_id']))
     logger.info(f"Successfully removed {'MP3' if is_audio else 'video'} file: {result['file_path']}")
 
-@dp.message(Command(commands=["yt", "video", " mp4"], prefix=BotCommands))
+@dp.message(Command(commands=["yt", "video", "mp4"], prefix=BotCommands))
 @new_task
 @SmartDefender
 async def video_command(message: Message, bot: Bot):
