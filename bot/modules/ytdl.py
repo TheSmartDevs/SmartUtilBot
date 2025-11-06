@@ -32,7 +32,7 @@ logger = LOGGER
 class DLConfig:
     TEMP_DIR = Path("./downloads")
     YT_COOKIES_PATH = YT_COOKIES_PATH
-    VIDEO_RESOLUTION = VIDEO_RESOLUTION
+    VIDEO_RESOLUTION = (1920, 1080)
     MAX_VIDEO_SIZE = MAX_VIDEO_SIZE
     COMMAND_PREFIX = COMMAND_PREFIX
     HEADERS = {
@@ -151,18 +151,18 @@ def get_ydl_opts(output_path: str, is_audio: bool = False) -> dict:
     }
     if is_audio:
         base.update({
-            'format': 'bestaudio/best',
+            'format': 'bestaudio[abr>=320]/bestaudio/best',
             'extractaudio': True,
             'audioformat': 'mp3',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
-                'preferredquality': DLConfig.AUDIO_QUALITY,
+                'preferredquality': '320',
             }],
         })
     else:
         base.update({
-            'format': f'bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={height}]+bestaudio/best[height<={height}]/best',
+            'format': f'bestvideo[height<={height}][ext=mp4]+bestaudio[abr>=192]/bestvideo[height<={height}]+bestaudio/best[height<={height}]/best',
             'merge_output_format': 'mp4',
             'postprocessors': [{
                 'key': 'FFmpegVideoConvertor',
@@ -170,7 +170,7 @@ def get_ydl_opts(output_path: str, is_audio: bool = False) -> dict:
             }],
             'prefer_ffmpeg': True,
             'postprocessor_args': {
-                'FFmpegVideoConvertor': ['-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', '-f', 'mp4']
+                'FFmpegVideoConvertor': ['-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-c:a', 'aac', '-b:a', '320k', '-f', 'mp4']
             }
         })
     return base
