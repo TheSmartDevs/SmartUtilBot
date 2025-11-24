@@ -1,6 +1,6 @@
 pyrofork
 tgcrypto
-aiogram
+aiogram==3.22.0
 google-generativeai
 aiohttp
 telethon
@@ -29,3 +29,5 @@ smartbindb
 qrcode
 reportlab
 pypdf
+requests
+pymediainfo-pyrofork
