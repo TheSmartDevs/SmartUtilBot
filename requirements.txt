@@ -26,6 +26,6 @@ py-yt-search
 lxml
 smartfaker
 smartbindb
-qrcode[pil]
+qrcode
 reportlab
 pypdf
