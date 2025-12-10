@@ -10,7 +10,7 @@ pytz
 telegraph
 pycountry
 beautifulsoup4
-pillow
+Pillow
 yt-dlp
 python-dateutil
 motor
@@ -29,5 +29,3 @@ smartbindb
 qrcode
 reportlab
 pypdf
-requests
-pymediainfo-pyrofork
