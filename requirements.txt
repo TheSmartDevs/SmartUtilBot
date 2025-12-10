@@ -4,6 +4,7 @@ aiogram==3.22.0
 google-generativeai
 aiohttp
 telethon
+httpx==0.13.3
 cryptg
 asyncio
 pytz
