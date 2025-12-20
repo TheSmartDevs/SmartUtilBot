@@ -13,7 +13,6 @@ Pillow
 yt-dlp
 python-dateutil
 motor
-gTTS
 aiofiles
 python-dotenv
 googletrans
