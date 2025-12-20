@@ -4,7 +4,6 @@ aiogram==3.22.0
 google-generativeai
 aiohttp
 telethon
-httpx==0.13.3
 cryptg
 asyncio
 pytz
@@ -18,7 +17,7 @@ motor
 gTTS
 aiofiles
 python-dotenv
-googletrans==4.0.0-rc1
+googletrans
 psutil
 pydub
 moviepy
