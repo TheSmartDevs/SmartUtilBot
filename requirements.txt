@@ -5,7 +5,6 @@ google-generativeai
 aiohttp
 telethon
 cryptg
-asyncio
 pytz
 telegraph
 pycountry
