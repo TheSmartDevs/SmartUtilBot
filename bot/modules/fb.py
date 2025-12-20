@@ -1,12 +1,10 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import os
 import re
 import asyncio
 import time
 import aiohttp
 import aiofiles
+import math
 from pathlib import Path
 from typing import Optional
 from aiogram import Bot
@@ -14,8 +12,6 @@ from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.enums import ParseMode
 from pyrogram.enums import ParseMode as SmartParseMode
-from pyrogram.types import Message as SmartMessage
-from moviepy import VideoFileClip
 from bot import dp, SmartPyro
 from bot.helpers.utils import new_task, clean_download
 from bot.helpers.botutils import send_message, delete_messages, get_args
@@ -30,12 +26,34 @@ logger = LOGGER
 
 class Config:
     TEMP_DIR = Path("./downloads")
+    MAX_DURATION = 7200
 Config.TEMP_DIR.mkdir(exist_ok=True)
+
+def parse_duration_to_seconds(duration_str: str) -> int:
+    try:
+        parts = duration_str.split(':')
+        if len(parts) == 3:
+            hours, minutes, seconds = map(int, parts)
+            return hours * 3600 + minutes * 60 + seconds
+        elif len(parts) == 2:
+            minutes, seconds = map(int, parts)
+            return minutes * 60 + seconds
+        elif len(parts) == 1:
+            return int(parts[0])
+        return 0
+    except:
+        return 0
+
+def format_duration(seconds: int) -> str:
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+    return f"{hours}h {minutes}m {seconds}s" if hours else f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
 
 class FacebookDownloader:
     async def sanitize_filename(self, title: str) -> str:
         title = re.sub(r'[<>:"/\\|?*]', '', title[:50]).strip()
         return f"{title.replace(' ', '_')}_{int(time.time())}"
+
     async def download_file(self, session: aiohttp.ClientSession, url: str, dest: Path, bot: Bot) -> None:
         try:
             async with session.get(url) as response:
@@ -52,7 +70,7 @@ class FacebookDownloader:
             logger.error(f"Error downloading file from {url}: {e}")
             await Smart_Notify(bot, f"{BotCommands}fb", e, None)
             raise
-            
+
     async def download_video(self, url: str, downloading_message: Message, bot: Bot) -> Optional[dict]:
         api_url = f"{A360APIBASEURL}/fb/dl?url={url}"
         try:
@@ -87,11 +105,21 @@ class FacebookDownloader:
                             except Exception as e:
                                 logger.warning(f"Failed to download thumbnail: {e}")
                                 thumbnail_filename = None
+                        duration_str = data.get("duration", "0:00")
+                        duration_seconds = parse_duration_to_seconds(duration_str)
+                        if duration_seconds > Config.MAX_DURATION:
+                            await downloading_message.edit_text("<b>Sorry Bro Video Is Over 2hrs</b>", parse_mode=ParseMode.HTML)
+                            clean_download(str(video_filename))
+                            if thumbnail_filename:
+                                clean_download(str(thumbnail_filename))
+                            return None
                         return {
                             'title': title,
                             'filename': str(video_filename),
                             'thumbnail': str(thumbnail_filename) if thumbnail_filename else None,
-                            'webpage_url': url
+                            'webpage_url': url,
+                            'duration_seconds': duration_seconds,
+                            'duration_str': format_duration(duration_seconds) if duration_seconds else duration_str
                         }
                     logger.error(f"API request failed: HTTP status {response.status}")
                     return None
@@ -107,7 +135,7 @@ class FacebookDownloader:
             logger.error(f"Facebook download error: {e}")
             await Smart_Notify(bot, f"{BotCommands}fb", e, downloading_message)
             return None
-            
+
 async def fb_handler(message: Message, bot: Bot):
     fb_downloader = FacebookDownloader()
     user_id = message.from_user.id if message.from_user else None
@@ -147,12 +175,10 @@ async def fb_handler(message: Message, bot: Bot):
         filename = video_info['filename']
         thumbnail = video_info['thumbnail']
         webpage_url = video_info['webpage_url']
-        video_clip = VideoFileClip(filename)
-        duration = video_clip.duration
-        duration_str = f"{int(duration // 60)}m {int(duration % 60)}s"
-        video_clip.close()
+        duration_str = video_info['duration_str']
+        duration_seconds = video_info['duration_seconds']
         user_info = (
-            f"<a href=\"tg://user?id={message.from_user.id}\">{message.from_user.first_name}{' ' + message.from_user.last_name if message.from_user.last_name else ''} {'🇧🇩' if message.from_user.language_code == 'bn' else ''}</a>" if message.from_user
+            f"<a href=\"tg://user?id={message.from_user.id}\">{message.from_user.first_name}{' ' + message.from_user.last_name if message.from_user.last_name else ''}</a>" if message.from_user
             else f"<a href=\"https://t.me/{message.chat.username or 'this group'}\">{message.chat.title}</a>"
         )
         caption = (
@@ -163,24 +189,23 @@ async def fb_handler(message: Message, bot: Bot):
             f"<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
             f"<b>Downloaded By</b> {user_info}"
         )
-        async with aiofiles.open(filename, 'rb'):
-            start_time = time.time()
-            last_update_time = [start_time]
-            send_video_params = {
-                'chat_id': message.chat.id,
-                'video': filename,
-                'supports_streaming': True,
-                'caption': caption,
-                'parse_mode': SmartParseMode.HTML,
-                'duration': int(duration),
-                'width': 1280,
-                'height': 720,
-                'progress': progress_bar,
-                'progress_args': (downloading_message, start_time, last_update_time)
-            }
-            if thumbnail:
-                send_video_params['thumb'] = thumbnail
-            await SmartPyro.send_video(**send_video_params)
+        start_time = time.time()
+        last_update_time = [start_time]
+        send_video_params = {
+            'chat_id': message.chat.id,
+            'video': filename,
+            'supports_streaming': True,
+            'caption': caption,
+            'parse_mode': SmartParseMode.HTML,
+            'duration': duration_seconds,
+            'width': 1280,
+            'height': 720,
+            'progress': progress_bar,
+            'progress_args': (downloading_message, start_time, last_update_time)
+        }
+        if thumbnail:
+            send_video_params['thumb'] = thumbnail
+        await SmartPyro.send_video(**send_video_params)
         await delete_messages(message.chat.id, [downloading_message.message_id])
         if os.path.exists(filename):
             clean_download(filename)
@@ -198,7 +223,7 @@ async def fb_handler(message: Message, bot: Bot):
         if 'thumbnail' in locals() and thumbnail and os.path.exists(thumbnail):
             clean_download(thumbnail)
             logger.info(f"Deleted thumbnail file on error: {thumbnail}")
-            
+
 @dp.message(Command(commands=["fb"], prefix=BotCommands))
 @new_task
 @SmartDefender
