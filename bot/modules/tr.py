@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import os
 import asyncio
 from io import BytesIO
@@ -10,7 +7,6 @@ from aiogram.filters import Command
 from aiogram.types import Message, FSInputFile
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
-from googletrans import Translator, LANGUAGES
 import google.generativeai as genai
 from bot import dp
 from bot.helpers.utils import new_task, clean_download
@@ -19,13 +15,13 @@ from bot.helpers.commands import BotCommands
 from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.defend import SmartDefender
-from config import TRANS_API_KEY, MODEL_NAME, IMGAI_SIZE_LIMIT
+from config import A360APIBASEURL, MODEL_NAME, IMGAI_SIZE_LIMIT
+import aiohttp
 
 DOWNLOAD_DIRECTORY = "./downloads/"
 if not os.path.exists(DOWNLOAD_DIRECTORY):
     os.makedirs(DOWNLOAD_DIRECTORY)
 
-translator = Translator()
 genai.configure(api_key=TRANS_API_KEY)
 model = genai.GenerativeModel(MODEL_NAME)
 
@@ -70,12 +66,18 @@ async def ocr_extract_text(bot: Bot, message: Message):
         if photo_path and os.path.exists(photo_path):
             clean_download(photo_path)
 
-def translate_text(text, target_lang):
+async def translate_text(text, target_lang):
     try:
         if not text or not text.strip():
             raise ValueError("Empty text provided for translation")
-        translation = translator.translate(text, dest=target_lang)
-        return translation.text
+        async with aiohttp.ClientSession() as session:
+            url = f"{A360APIBASEURL}/tr"
+            params = {"text": text, "lang": target_lang}
+            async with session.get(url, params=params) as resp:
+                if resp.status != 200:
+                    raise ValueError(f"API error: {resp.status}")
+                data = await resp.json()
+                return data.get("translated_text", "")
     except Exception as e:
         raise
 
@@ -85,41 +87,27 @@ async def format_text(text):
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     return '\n'.join(lines)
 
-@dp.message(Command(commands=["tr"] + [f"tr{code}" for code in LANGUAGES.keys()], prefix=BotCommands))
+@dp.message(Command(commands=["tr"], prefix=BotCommands))
 @new_task
 @SmartDefender
 async def tr_handler(message: Message, bot: Bot):
     loading_message = None
     try:
-        cmd = message.text.split()[0][1:].lower()
-        combined_format = len(cmd) > 2 and cmd[2:] in LANGUAGES
-        photo_mode = message.reply_to_message and message.reply_to_message.photo
-        text_mode = (message.reply_to_message and message.reply_to_message.text) or (get_args(message) and not combined_format) or (combined_format and len(get_args(message)) > 0)
-        if combined_format:
-            target_lang = cmd[2:]
-            text_to_translate = " ".join(get_args(message)) if not (photo_mode or (message.reply_to_message and message.reply_to_message.text)) else None
-        else:
-            args = get_args(message)
-            if not args:
-                loading_message = await send_message(
-                    chat_id=message.chat.id,
-                    text="<b>❌ Invalid Language Code!</b>",
-                    parse_mode=ParseMode.HTML,
-                    disable_web_page_preview=True
-                )
-                return
-            target_lang = args[0].lower()
-            text_to_translate = " ".join(args[1:]) if not (photo_mode or (message.reply_to_message and message.reply_to_message.text)) else None
-        if target_lang not in LANGUAGES:
+        args = get_args(message)
+        if not args:
             loading_message = await send_message(
                 chat_id=message.chat.id,
-                text="<b>❌ Invalid Language Code!</b>",
+                text="<b>❌ Invalid Usage! Use /tr <lang_code> [text] or reply</b>",
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
             return
+        target_lang = args[0].lower()
+        photo_mode = message.reply_to_message and message.reply_to_message.photo
+        text_mode = (message.reply_to_message and message.reply_to_message.text) or (len(args) > 1)
+        text_to_translate = None
         if text_mode and not photo_mode:
-            text_to_translate = message.reply_to_message.text if message.reply_to_message and message.reply_to_message.text else text_to_translate
+            text_to_translate = message.reply_to_message.text if message.reply_to_message and message.reply_to_message.text else " ".join(args[1:])
             if not text_to_translate:
                 loading_message = await send_message(
                     chat_id=message.chat.id,
@@ -147,7 +135,7 @@ async def tr_handler(message: Message, bot: Bot):
             return
         loading_message = await send_message(
             chat_id=message.chat.id,
-            text=f"<b>Translating Your {'Image' if photo_mode else 'Text'} Into {LANGUAGES[target_lang].capitalize()}...</b>",
+            text=f"<b>Translating Your {'Image' if photo_mode else 'Text'}...</b>",
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True
         )
@@ -183,8 +171,7 @@ async def tr_handler(message: Message, bot: Bot):
                     )
                 return
         try:
-            initial_translation = translate_text(text_to_translate, 'en')
-            translated_text = translate_text(initial_translation, target_lang)
+            translated_text = await translate_text(text_to_translate, target_lang)
             formatted_text = await format_text(translated_text)
             if not formatted_text:
                 raise ValueError("Translation resulted in empty text")
