@@ -67,7 +67,8 @@ def format_size(size_bytes: int) -> str:
 class FacebookDownloader:
     async def sanitize_filename(self, title: str) -> str:
         title = re.sub(r'[<>:"/\\|?*]', '', title[:100]).strip()
-        return f"{re.sub(r'\s+', '_', title)}_{int(time.time())}"
+        sanitized = re.sub(r'\s+', '_', title)
+        return f"{sanitized}_{int(time.time())}"
 
     async def download_file(self, session: aiohttp.ClientSession, url: str, dest: Path, bot: Bot) -> None:
         try:
@@ -210,10 +211,12 @@ async def fb_handler(message: Message, bot: Bot):
         duration_str = video_info['duration_str']
         duration_seconds = video_info['duration_seconds']
 
-        user_info = (
-            f"<a href=\"tg://user?id={message.from_user.id}\">{message.from_user.first_name}{' ' + message.from_user.last_name if message.from_user.last_name else ''}</a>"
-            if message.from_user else message.chat.title
-        )
+        if message.from_user:
+            last_name_part = ' ' + message.from_user.last_name if message.from_user.last_name else ''
+            user_link = f"tg://user?id={message.from_user.id}"
+            user_info = f"<a href=\"{user_link}\">{message.from_user.first_name}{last_name_part}</a>"
+        else:
+            user_info = message.chat.title
 
         caption = (
             f"📹 <b>Title:</b> <code>{title}</code>\n"
