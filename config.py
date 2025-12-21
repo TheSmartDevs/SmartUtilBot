@@ -41,9 +41,7 @@ A360APIBASEURL = get_env_or_default("A360APIBASEURL", "https://a360api-c8fbf2fa3
 GROQ_API_KEY = get_env_or_default("GROQ_API_KEY", "Your_GROQ_API_KEY_Here")
 WEB_SS_KEY = get_env_or_default("WEB_SS_KEY", "Your_WEB_SS_KEY_Here")
 IMAGE_UPLOAD_KEY = get_env_or_default("IMAGE_UPLOAD_KEY", "Your_IMAGE_UPLOAD_KEY_Here")
-GROQ_API_URL = get_env_or_default("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
-DOMAIN_API_KEY = get_env_or_default("DOMAIN_API_KEY", "Your_DOMAIN_API_KEY_Here")
-DOMAIN_API_URL = get_env_or_default("DOMAIN_API_URL", "https://www.whoisxmlapi.com/whoisserver/WhoisService")
+GROQ_API_URL = get_env_or_default("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 TEXT_MODEL = get_env_or_default("TEXT_MODEL", "deepseek-r1-distill-llama-70b")
 IPINFO_API_TOKEN = get_env_or_default("IPINFO_API_TOKEN", "Your_IPINFO_API_TOKEN_Here")
 raw_prefixes = get_env_or_default("COMMAND_PREFIX", "!|.|#|,|/")
