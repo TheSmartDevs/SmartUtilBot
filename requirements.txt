@@ -1,6 +1,6 @@
 pyrofork
 tgcrypto
-aiogram==3.22.0
+aiogram
 google-generativeai
 aiohttp
 telethon
@@ -15,7 +15,6 @@ python-dateutil
 motor
 aiofiles
 python-dotenv
-googletrans
 psutil
 pydub
 speedtest-cli
