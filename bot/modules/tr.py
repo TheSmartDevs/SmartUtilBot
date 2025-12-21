@@ -15,7 +15,7 @@ from bot.helpers.commands import BotCommands
 from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.defend import SmartDefender
-from config import A360APIBASEURL, MODEL_NAME, IMGAI_SIZE_LIMIT
+from config import A360APIBASEURL, MODEL_NAME, IMGAI_SIZE_LIMIT, TRANS_API_KEY
 import aiohttp
 
 DOWNLOAD_DIRECTORY = "./downloads/"
