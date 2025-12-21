@@ -236,7 +236,7 @@ async def fb_handler(message: Message, bot: Bot):
             'supports_streaming': True,
             'caption': caption,
             'parse_mode': SmartParseMode.HTML,
-            'duration': duration_seconds if duration_seconds > 0 else None,
+            'duration': float(duration_seconds) if duration_seconds > 0 else None,
             'width': 1280,
             'height': 720,
             'progress': progress_bar,
