@@ -15,8 +15,8 @@ from bot.helpers.logger import LOGGER
 from bot.helpers.utils import new_task
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.defend import SmartDefender
+from config import A360APIBASEURL 
 
-API_BASE = "https://smarturl-murex.vercel.app/api"
 
 user_states: Dict[int, Dict] = {}
 user_data: Dict[int, Dict] = {}
@@ -49,19 +49,21 @@ def is_valid_slug(slug: str) -> bool:
 async def create_short_url(session: aiohttp.ClientSession, long_url: str, custom_slug: str = None):
     params = {"url": long_url}
     if custom_slug:
-        params["slug"] = custom_slug
+        params["custom_slug"] = custom_slug
     try:
-        async with session.get(f"{API_BASE}/short", params=params) as resp:
+        async with session.get(f"{A360APIBASEURL}/shortner/shorten", params=params) as resp:
             if resp.status == 200:
-                return await resp.json()
+                data = await resp.json()
+                if data.get("success"):
+                    return data
             return None
     except Exception as e:
         LOGGER.error(f"API Error creating short URL: {e}")
         return None
 
-async def check_stats(session: aiohttp.ClientSession, short_url: str):
+async def check_stats(session: aiohttp.ClientSession, short_code: str):
     try:
-        async with session.get(f"{API_BASE}/chk", params={"url": short_url}) as resp:
+        async with session.get(f"{A360APIBASEURL}/shortner/stats/{short_code}") as resp:
             if resp.status == 200:
                 return await resp.json()
             return None
@@ -69,11 +71,13 @@ async def check_stats(session: aiohttp.ClientSession, short_url: str):
         LOGGER.error(f"API Error checking stats: {e}")
         return None
 
-async def delete_url(session: aiohttp.ClientSession, short_url: str):
+async def delete_url(session: aiohttp.ClientSession, short_code: str):
     try:
-        async with session.get(f"{API_BASE}/del", params={"url": short_url}) as resp:
+        async with session.get(f"{A360APIBASEURL}/shortner/delete/{short_code}") as resp:
             if resp.status == 200:
-                return await resp.json()
+                data = await resp.json()
+                if data.get("success"):
+                    return data
             return None
     except Exception as e:
         LOGGER.error(f"API Error deleting URL: {e}")
@@ -91,7 +95,7 @@ def get_welcome_message() -> str:
         "• Landing pages\n\n"
         "<b>Examples:</b>\n"
         "<code>https://www.example.com/very/long/url/with/parameters?id=123</code>\n\n"
-        "Send the URL now!"
+        "<b>Send the URL now!</b>"
     )
 
 def get_customize_message() -> str:
@@ -101,7 +105,7 @@ def get_customize_message() -> str:
         "<b>✨ Auto-Generated:</b> a random short code\n"
         "<b>✏️ Custom Slug:</b> Choose your own memorable slug\n\n"
         "<b>Example custom slug:</b>\n"
-        "<code>https://smarturl-murex.vercel.app/040CE6</code> → slug is <code>040CE6</code>"
+        "<code>https://a360api.up.railway.app/shortner/040CE6</code> → slug is <code>040CE6</code>"
     )
 
 def get_result_message(short_url: str, original_url: str, clicks: int = 0, created: str = None) -> str:
@@ -195,6 +199,7 @@ async def short_handler(message: Message, bot: Bot):
                 if data and "short_url" in data:
                     short_url = data["short_url"]
                     original_url = data["original_url"]
+                    short_code = data["short_code"]
                     
                     await bot.edit_message_text(
                         text=get_result_message(short_url, original_url),
@@ -206,13 +211,14 @@ async def short_handler(message: Message, bot: Bot):
                     
                     set_data(user_id, {
                         "short_url": short_url,
-                        "original_url": original_url
+                        "original_url": original_url,
+                        "short_code": short_code
                     })
                     set_state(user_id, "url_created")
                     LOGGER.info(f"Successfully created short URL for user {user_id}")
                 else:
                     await bot.edit_message_text(
-                        text="❌ Failed to shorten URL. Try again.",
+                        text="<b>❌ Failed to shorten URL. Try again.</b>",
                         chat_id=message.chat.id,
                         message_id=loading.message_id,
                         parse_mode=ParseMode.HTML
@@ -249,7 +255,7 @@ async def handle_url_input(message: Message, bot: Bot):
     if not is_valid_url(url):
         await send_message(
             chat_id=message.chat.id,
-            text="❌ Please send a valid HTTP/HTTPS URL.",
+            text="<b>❌ Please send a valid HTTP/HTTPS URL.</b>",
             parse_mode=ParseMode.HTML
         )
         LOGGER.warning(f"Invalid URL from user {user_id}")
@@ -283,7 +289,7 @@ async def handle_custom_slug(message: Message, bot: Bot):
     if not is_valid_slug(slug):
         await send_message(
             chat_id=message.chat.id,
-            text="❌ Invalid slug. Use only letters, numbers, and hyphens.",
+            text="<b>❌ Invalid slug. Use only letters, numbers, and hyphens.</b>",
             parse_mode=ParseMode.HTML
         )
         LOGGER.warning(f"Invalid slug from user {user_id}")
@@ -295,7 +301,7 @@ async def handle_custom_slug(message: Message, bot: Bot):
     if not long_url:
         await send_message(
             chat_id=message.chat.id,
-            text="❌ Session expired. Use /short to start over.",
+            text="<b>❌ Session expired. Use /short to start over.</b>",
             parse_mode=ParseMode.HTML
         )
         clear_state(user_id)
@@ -314,6 +320,7 @@ async def handle_custom_slug(message: Message, bot: Bot):
             if resp and "short_url" in resp:
                 short_url = resp["short_url"]
                 original_url = resp["original_url"]
+                short_code = resp["short_code"]
                 
                 await bot.edit_message_text(
                     text=get_result_message(short_url, original_url),
@@ -325,7 +332,8 @@ async def handle_custom_slug(message: Message, bot: Bot):
                 
                 set_data(user_id, {
                     "short_url": short_url,
-                    "original_url": original_url
+                    "original_url": original_url,
+                    "short_code": short_code
                 })
                 set_state(user_id, "url_created")
                 
@@ -333,7 +341,7 @@ async def handle_custom_slug(message: Message, bot: Bot):
                 LOGGER.info(f"Successfully created custom short URL for user {user_id}")
             else:
                 await bot.edit_message_text(
-                    text="❌ Failed to create with custom slug. Try another.",
+                    text="<b>❌ Failed to create with custom slug. Try another.</b>",
                     chat_id=message.chat.id,
                     message_id=loading.message_id,
                     parse_mode=ParseMode.HTML
@@ -389,6 +397,7 @@ async def auto_generate(callback: CallbackQuery, bot: Bot):
             if resp and "short_url" in resp:
                 short_url = resp["short_url"]
                 original_url = resp["original_url"]
+                short_code = resp["short_code"]
                 
                 await callback.message.edit_text(
                     text=get_result_message(short_url, original_url),
@@ -398,13 +407,14 @@ async def auto_generate(callback: CallbackQuery, bot: Bot):
                 
                 set_data(user_id, {
                     "short_url": short_url,
-                    "original_url": original_url
+                    "original_url": original_url,
+                    "short_code": short_code
                 })
                 set_state(user_id, "url_created")
                 LOGGER.info(f"Successfully auto-generated URL for user {user_id}")
             else:
                 await callback.message.edit_text(
-                    "❌ Failed to create short URL.",
+                    "<b>❌ Failed to create short URL.</b>",
                     parse_mode=ParseMode.HTML
                 )
                 set_state(user_id, "waiting_url")
@@ -451,7 +461,7 @@ async def refresh_stats(callback: CallbackQuery, bot: Bot):
     user_id = callback.from_user.id
     data = get_data(user_id)
     
-    if not data or "short_url" not in data:
+    if not data or "short_code" not in data:
         await callback.answer("❌ No URL data found", show_alert=True)
         LOGGER.warning(f"No URL data for user {user_id} in refresh_stats")
         return
@@ -459,12 +469,13 @@ async def refresh_stats(callback: CallbackQuery, bot: Bot):
     LOGGER.info(f"User {user_id} refreshing stats")
     await callback.answer("🔄 Refreshing Statistics...")
     
+    short_code = data["short_code"]
     short_url = data["short_url"]
     original_url = data["original_url"]
     
     try:
         async with aiohttp.ClientSession() as session:
-            stats = await check_stats(session, short_url)
+            stats = await check_stats(session, short_code)
             
             if stats:
                 clicks = stats.get("clicks", 0)
@@ -543,12 +554,13 @@ async def perform_delete(callback: CallbackQuery, bot: Bot):
     user_id = callback.from_user.id
     data = get_data(user_id)
     
-    if not data or "short_url" not in data:
+    if not data or "short_code" not in data:
         await callback.answer("❌ No URL data found", show_alert=True)
         LOGGER.warning(f"No URL data for user {user_id} in perform_delete")
         return
     
     LOGGER.info(f"User {user_id} confirming delete")
+    short_code = data["short_code"]
     short_url = data["short_url"]
     
     try:
@@ -558,9 +570,9 @@ async def perform_delete(callback: CallbackQuery, bot: Bot):
         )
         
         async with aiohttp.ClientSession() as session:
-            result = await delete_url(session, short_url)
+            result = await delete_url(session, short_code)
             
-            if result and result.get("status") == "deleted":
+            if result and result.get("success"):
                 await callback.message.edit_text(
                     get_deleted_message(short_url),
                     parse_mode=ParseMode.HTML
@@ -569,7 +581,7 @@ async def perform_delete(callback: CallbackQuery, bot: Bot):
                 LOGGER.info(f"Successfully deleted URL for user {user_id}")
             else:
                 await callback.message.edit_text(
-                    "❌ Failed to delete URL.",
+                    "<b>❌ Failed to delete short URL.</b>",
                     parse_mode=ParseMode.HTML
                 )
                 LOGGER.warning(f"Failed to delete URL for user {user_id}")
