@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import aiohttp
 import asyncio
 from aiogram import Bot
@@ -14,56 +11,39 @@ from bot.helpers.notify import Smart_Notify
 from bot.helpers.logger import LOGGER
 from bot.helpers.commands import BotCommands
 from bot.helpers.defend import SmartDefender
-from config import DOMAIN_API_KEY, DOMAIN_API_URL, DOMAIN_CHK_LIMIT
+from config import A360APIBASEURL, DOMAIN_CHK_LIMIT
 
 logger = LOGGER
 
-async def format_date(date_str):
-    return date_str
-    
 async def get_domain_info(domain: str, bot: Bot) -> str:
-    params = {
-        "apiKey": DOMAIN_API_KEY,
-        "domainName": domain,
-        "outputFormat": "JSON"
-    }
+    url = f"{A360APIBASEURL}/dmn"
+    params = {"domain": domain}
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(DOMAIN_API_URL, params=params) as response:
+            async with session.get(url, params=params) as response:
                 response.raise_for_status()
                 data = await response.json()
                 logger.info(f"Response for domain {domain}: {data}")
-                if data.get("WhoisRecord"):
-                    whois_record = data["WhoisRecord"]
-                    status = whois_record.get("status", "Unknown").lower()
-                    data_error = whois_record.get("dataError", "")
-                    registrar = whois_record.get("registrarName", "Unknown")
-                    registration_date = await format_date(whois_record.get("createdDate", "Unknown"))
-                    expiration_date = await format_date(whois_record.get("expiresDate", "Unknown"))
-                    if status == "available" or data_error == "MISSING_WHOIS_DATA" or not whois_record.get("registryData"):
-                        return (
-                            f"<b>Smart A360 Domain Check Results...✅</b>\n"
-                            f"<b>━━━━━━━━━━━━━━━━━━</b>\n"
-                            f"<b>Domain : </b><code>{domain}</code>\n"
-                            f"<b>Congrats !🥳 This Domain Is Available. ✅</b>\n"
-                            f"<b>━━━━━━━━━━━━━━━━━━</b>"
-                        )
-                    else:
-                        return (
-                            f"<b>Smart A360 Domain Check Results...✅</b>\n"
-                            f"<b>━━━━━━━━━━━━━━━━━━</b>\n"
-                            f"<b>Domain : </b><code>{domain}</code>\n"
-                            f"<b>Registrar : </b><code>{registrar}</code>\n"
-                            f"<b>Registration Date : </b><code>{registration_date}</code>\n"
-                            f"<b>Expiration Date : </b><code>{expiration_date}</code>\n"
-                            f"<b>━━━━━━━━━━━━━━━━━━</b>"
-                        )
-                else:
+                domain_name = data.get("domain", domain)
+                if data.get("registered_on") is None:
                     return (
                         f"<b>Smart A360 Domain Check Results...✅</b>\n"
                         f"<b>━━━━━━━━━━━━━━━━━━</b>\n"
-                        f"<b>Domain : </b><code>{domain}</code>\n"
+                        f"<b>Domain : </b><code>{domain_name}</code>\n"
                         f"<b>Congrats !🥳 This Domain Is Available. ✅</b>\n"
+                        f"<b>━━━━━━━━━━━━━━━━━━</b>"
+                    )
+                else:
+                    registrar = data.get("registrar", "Unknown")
+                    registered_on = data.get("registered_on", "Unknown")
+                    expires_on = data.get("expires_on", "Unknown")
+                    return (
+                        f"<b>Smart A360 Domain Check Results...✅</b>\n"
+                        f"<b>━━━━━━━━━━━━━━━━━━</b>\n"
+                        f"<b>Domain : </b><code>{domain_name}</code>\n"
+                        f"<b>Registrar : </b><code>{registrar}</code>\n"
+                        f"<b>Registration Date : </b><code>{registered_on}</code>\n"
+                        f"<b>Expiration Date : </b><code>{expires_on}</code>\n"
                         f"<b>━━━━━━━━━━━━━━━━━━</b>"
                     )
     except aiohttp.ClientError as e:
@@ -74,7 +54,7 @@ async def get_domain_info(domain: str, bot: Bot) -> str:
         logger.error(f"Exception occurred while fetching info for domain {domain}: {e}")
         await Smart_Notify(bot, "/dmn", e, None)
         return f"<b>❌ Sorry Bro Domain Check API Dead</b>"
-        
+
 @dp.message(Command(commands=["dmn", ".dmn"], prefix=BotCommands))
 @new_task
 @SmartDefender
