@@ -5,14 +5,13 @@ import asyncio
 import aiohttp
 import aiofiles
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 from aiogram import Bot
 from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.exceptions import TelegramBadRequest
 from pyrogram.types import InputMediaPhoto, InputMediaVideo
 from pyrogram.enums import ParseMode as SmartParseMode
-from moviepy import VideoFileClip
 from bot import dp, SmartPyro
 from bot.helpers.utils import new_task, clean_download
 from bot.helpers.botutils import send_message, delete_messages, get_args
@@ -20,7 +19,6 @@ from bot.helpers.commands import BotCommands
 from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.defend import SmartDefender
-from bot.helpers.pgbar import progress_bar
 from config import A360APIBASEURL
 
 class Config:
@@ -39,42 +37,25 @@ class InstagramDownloader:
         safe_shortcode = re.sub(r'[<>:"/\\|?*]', '', shortcode[:30]).strip()
         return f"{safe_shortcode}_{index}_{int(time.time())}.{'mp4' if media_type == 'video' else 'jpg'}"
 
-    async def sanitize_caption(self, caption: str) -> str:
-        if not caption or caption.lower() == "unknown":
-            return "Instagram Content"
-        sanitized = re.sub(r'@\w+', '', caption).strip()
-        return sanitized if sanitized else "Instagram Content"
-
     async def download_file(self, session: aiohttp.ClientSession, url: str, dest: Path, retries: int = Config.DOWNLOAD_RETRIES) -> Path:
         for attempt in range(1, retries + 1):
             try:
                 async with session.get(url) as response:
                     if response.status == 200:
-                        LOGGER.info(f"Downloading file from {url} to {dest} (attempt {attempt}/{retries})")
                         async with aiofiles.open(dest, mode='wb') as f:
                             async for chunk in response.content.iter_chunked(1024 * 1024):
                                 await f.write(chunk)
-                        LOGGER.info(f"File downloaded successfully to {dest}")
                         return dest
                     else:
-                        error_msg = f"Failed to download {url}: Status {response.status}"
-                        LOGGER.error(error_msg)
                         if attempt == retries:
-                            raise Exception(error_msg)
+                            raise Exception(f"Failed to download {url}: Status {response.status}")
             except aiohttp.ClientError as e:
-                error_msg = f"Error downloading file from {url}: {e}"
-                LOGGER.error(error_msg)
                 if attempt == retries:
-                    raise Exception(error_msg)
+                    raise Exception(f"Error downloading file from {url}: {e}")
             except Exception as e:
-                error_msg = f"Unexpected error downloading file from {url}: {e}"
-                LOGGER.error(error_msg)
                 if attempt == retries:
-                    raise Exception(error_msg)
-            
-            LOGGER.info(f"Retrying download for {url} in {Config.RETRY_DELAY} seconds...")
+                    raise Exception(f"Unexpected error downloading file from {url}: {e}")
             await asyncio.sleep(Config.RETRY_DELAY)
-        
         raise Exception(f"Failed to download {url} after {retries} attempts")
 
     async def download_content(self, url: str, downloading_message: Message, content_type: str) -> Optional[dict]:
@@ -87,16 +68,12 @@ class InstagramDownloader:
                 timeout=aiohttp.ClientTimeout(total=30)
             ) as session:
                 async with session.get(api_url) as response:
-                    LOGGER.info(f"API request to {api_url} returned status {response.status}")
                     if response.status != 200:
-                        LOGGER.error(f"API request failed: HTTP status {response.status}")
                         return None
                     
                     data = await response.json()
-                    LOGGER.info(f"API response: {data}")
                     
                     if data.get("status") != "success":
-                        LOGGER.error("API response indicates failure")
                         return None
                     
                     if content_type in ["reel", "igtv"]:
@@ -110,9 +87,11 @@ class InstagramDownloader:
                     thumbnail_tasks = []
                     thumbnail_paths = []
                     
-                    for index, media in enumerate(data["results"]):
+                    shortcode = url.split('/')[-2] if '/p/' in url or '/reel/' in url else 'unknown'
+                    
+                    for index, media in enumerate(data["results"], start=1):
                         media_type = "video" if media["label"].startswith("video") else "image"
-                        filename = self.temp_dir / await self.sanitize_filename(url.split('/')[-2], index, media_type)
+                        filename = self.temp_dir / await self.sanitize_filename(shortcode, index, media_type)
                         tasks.append(self.download_file(session, media["download"], filename))
                         
                         thumbnail_url = media.get("thumbnail")
@@ -125,19 +104,21 @@ class InstagramDownloader:
                             thumbnail_paths.append(None)
                     
                     downloaded_files = await asyncio.gather(*tasks, return_exceptions=True)
-                    downloaded_thumbnails = await asyncio.gather(*[t for t in thumbnail_tasks if t], return_exceptions=True) if any(t for t in thumbnail_tasks) else [None] * len(tasks)
+                    downloaded_thumbnails = await asyncio.gather(*[t for t in thumbnail_tasks if t is not None], return_exceptions=True)
+                    thumb_index = 0
                     
-                    for index, (result, thumbnail_result, thumbnail_path) in enumerate(zip(downloaded_files, thumbnail_tasks, thumbnail_paths)):
+                    for index, result in enumerate(downloaded_files):
                         if isinstance(result, Exception):
-                            LOGGER.error(f"Failed to download media {index} for URL {data['results'][index]['download']}: {result}")
-                            if thumbnail_path and os.path.exists(thumbnail_path):
-                                clean_download(thumbnail_path)
-                                LOGGER.info(f"Deleted orphaned thumbnail: {thumbnail_path}")
+                            if thumbnail_paths[index] and thumbnail_paths[index].exists():
+                                clean_download(thumbnail_paths[index])
                             continue
                         
                         thumbnail_filename = None
-                        if thumbnail_result and not isinstance(thumbnail_result, Exception):
-                            thumbnail_filename = str(thumbnail_path)
+                        if thumbnail_tasks[index] is not None:
+                            thumb_result = downloaded_thumbnails[thumb_index]
+                            if not isinstance(thumb_result, Exception):
+                                thumbnail_filename = str(thumbnail_paths[index])
+                            thumb_index += 1
                         
                         media_files.append({
                             "filename": str(result),
@@ -146,14 +127,14 @@ class InstagramDownloader:
                         })
                     
                     if not media_files:
-                        LOGGER.error("No media files downloaded successfully")
                         return None
                     
+                    post_type = "carousel" if data.get("media_count", 1) > 1 else ("video" if any(m["label"].startswith("video") for m in data["results"]) else "image")
+                    
                     return {
-                        "title": await self.sanitize_caption("Instagram Content"),
                         "media_files": media_files,
                         "webpage_url": url,
-                        "type": "carousel" if data.get("media_count", 1) > 1 else ("video" if data["results"][0]["label"].startswith("video") else "image")
+                        "type": post_type
                     }
         
         except Exception as e:
@@ -164,7 +145,6 @@ class InstagramDownloader:
 @new_task
 @SmartDefender
 async def insta_handler(message: Message, bot: Bot):
-    LOGGER.info(f"Received command: '{message.text}' from user {message.from_user.id if message.from_user else 'Unknown'} in chat {message.chat.id}")
     progress_message = None
     
     try:
@@ -186,10 +166,8 @@ async def insta_handler(message: Message, bot: Bot):
                 text="<b>Please provide a valid Instagram URL or reply to a message with one ❌</b>",
                 parse_mode=SmartParseMode.HTML
             )
-            LOGGER.info(f"No Instagram URL provided in chat {message.chat.id}")
             return
         
-        LOGGER.info(f"Instagram URL received: {url}, user: {message.from_user.id or 'unknown'}, chat: {message.chat.id}")
         content_type = "reel" if "/reel/" in url else "igtv" if "/tv/" in url else "story" if "/stories/" in url else "post"
         
         progress_message = await send_message(
@@ -208,13 +186,12 @@ async def insta_handler(message: Message, bot: Bot):
                 text="<b>Unable To Extract The URL 😕</b>",
                 parse_mode=SmartParseMode.HTML
             )
-            LOGGER.error(f"Failed to download content for URL: {url}")
             return
         
         media_files = content_info["media_files"]
         content_type = content_info["type"]
         
-        if content_type == "carousel" or media_files[0]["type"] == "image":
+        if content_type in ["carousel", "image"]:
             await progress_message.edit_text(
                 "<code>📤 Uploading...</code>",
                 parse_mode=SmartParseMode.HTML
@@ -232,14 +209,10 @@ async def insta_handler(message: Message, bot: Bot):
                                 )
                             )
                         else:
-                            video_clip = VideoFileClip(media["filename"])
-                            duration = video_clip.duration
-                            video_clip.close()
                             media_group.append(
                                 InputMediaVideo(
                                     media=media["filename"],
                                     thumb=media["thumbnail"] if media["thumbnail"] else None,
-                                    duration=int(duration),
                                     supports_streaming=True
                                 )
                             )
@@ -251,19 +224,11 @@ async def insta_handler(message: Message, bot: Bot):
             else:
                 media = media_files[0]
                 if media["type"] == "video":
-                    video_clip = VideoFileClip(media["filename"])
-                    duration = video_clip.duration
-                    video_clip.close()
-                    start_time = time.time()
-                    last_update_time = [start_time]
                     await SmartPyro.send_video(
                         chat_id=message.chat.id,
                         video=media["filename"],
                         thumb=media["thumbnail"] if media["thumbnail"] else None,
-                        duration=int(duration),
-                        supports_streaming=True,
-                        progress=progress_bar,
-                        progress_args=(progress_message, start_time, last_update_time)
+                        supports_streaming=True
                     )
                 else:
                     await SmartPyro.send_photo(
@@ -272,37 +237,30 @@ async def insta_handler(message: Message, bot: Bot):
                     )
             
             await delete_messages(message.chat.id, progress_message.message_id)
-            LOGGER.info(f"Successfully uploaded {content_type} for URL {url} to chat {message.chat.id}")
             
         except Exception as e:
-            LOGGER.error(f"Error uploading Instagram content in chat {message.chat.id}: {str(e)}")
+            LOGGER.error(f"Error uploading Instagram content: {str(e)}")
             await Smart_Notify(bot, "insta", e, message)
             try:
                 await progress_message.edit_text(
                     text="<b>❌ Sorry, failed to upload media</b>",
                     parse_mode=SmartParseMode.HTML
                 )
-                LOGGER.info(f"Edited progress message with upload error in chat {message.chat.id}")
-            except TelegramBadRequest as edit_e:
-                LOGGER.error(f"Failed to edit progress message in chat {message.chat.id}: {str(edit_e)}")
-                await Smart_Notify(bot, "insta", edit_e, message)
+            except TelegramBadRequest:
                 await send_message(
                     chat_id=message.chat.id,
                     text="<b>❌ Sorry, failed to upload media</b>",
                     parse_mode=SmartParseMode.HTML
                 )
-                LOGGER.info(f"Sent upload error message to chat {message.chat.id}")
         
         finally:
             for media in media_files:
                 clean_download(media["filename"])
-                LOGGER.info(f"Deleted media file: {media['filename']}")
-                if media["thumbnail"]:
+                if media.get("thumbnail"):
                     clean_download(media["thumbnail"])
-                    LOGGER.info(f"Deleted thumbnail file: {media['thumbnail']}")
     
     except Exception as e:
-        LOGGER.error(f"Error processing Instagram command in chat {message.chat.id}: {str(e)}")
+        LOGGER.error(f"Error processing Instagram command: {str(e)}")
         await Smart_Notify(bot, "insta", e, message)
         
         if progress_message:
@@ -311,20 +269,15 @@ async def insta_handler(message: Message, bot: Bot):
                     text="<b>❌ Sorry, failed to process Instagram URL</b>",
                     parse_mode=SmartParseMode.HTML
                 )
-                LOGGER.info(f"Edited progress message with error in chat {message.chat.id}")
-            except TelegramBadRequest as edit_e:
-                LOGGER.error(f"Failed to edit progress message in chat {message.chat.id}: {str(edit_e)}")
-                await Smart_Notify(bot, "insta", edit_e, message)
+            except TelegramBadRequest:
                 await send_message(
                     chat_id=message.chat.id,
                     text="<b>❌ Sorry, failed to process Instagram URL</b>",
                     parse_mode=SmartParseMode.HTML
                 )
-                LOGGER.info(f"Sent error message to chat {message.chat.id}")
         else:
             await send_message(
                 chat_id=message.chat.id,
                 text="<b>❌ Sorry, failed to process Instagram URL</b>",
                 parse_mode=SmartParseMode.HTML
             )
-            LOGGER.info(f"Sent error message to chat {message.chat.id}")
