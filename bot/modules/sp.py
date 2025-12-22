@@ -58,6 +58,9 @@ async def download_image(url: str, output_path: str, bot: Bot) -> Optional[str]:
     return None
 
 async def handle_spotify_request(message: Message, bot: Bot, input_text: Optional[str]):
+    output_filename = None
+    cover_path = None
+    
     if not input_text and message.reply_to_message and message.reply_to_message.text:
         input_text = message.reply_to_message.text.strip()
     if not input_text:
@@ -139,16 +142,22 @@ async def handle_spotify_request(message: Message, bot: Bot, input_text: Optiona
                         logger.error(f"Search API request failed: HTTP status {response.status}")
                         await Smart_Notify(bot, f"{BotCommands}sp", Exception(f"Search API request failed: HTTP status {response.status}"), status)
                         return
-            title = data["track"]["title"]
-            artists = ", ".join(artist["name"] for artist in data["track"]["artists"])
-            duration = data["track"]["duration"]
-            album = data["track"]["album"]["name"]
-            release_date = data["track"]["album"]["release_date"]
-            spotify_url = data["track"]["url"]
-            download_url = data["download"]["link"]
-            cover_url = data["track"].get("cover")
-            cover_path = None
-            output_filename = None
+            
+            title = data.get("title", "Unknown")
+            artists = data.get("author", "Unknown")
+            duration = data.get("duration", "Unknown")
+            album = artists
+            release_date = "Unknown"
+            spotify_url = input_text if is_url else track_url
+            download_url = data.get("download_link")
+            cover_url = data.get("cover")
+            
+            if not download_url:
+                await status.edit_text("<b>❌ Download link not available</b>", parse_mode=ParseMode.HTML)
+                logger.error("Download link not available in API response")
+                await Smart_Notify(bot, f"{BotCommands}sp", Exception("Download link not available"), status)
+                return
+            
             if cover_url:
                 Config.TEMP_DIR.mkdir(exist_ok=True)
                 cover_path = Config.TEMP_DIR / f"{await sanitize_filename(title)}.jpg"
@@ -158,6 +167,7 @@ async def handle_spotify_request(message: Message, bot: Bot, input_text: Optiona
                 else:
                     logger.warning("Failed to download cover image")
                     cover_path = None
+            
             safe_title = await sanitize_filename(title)
             output_filename = Config.TEMP_DIR / f"{safe_title}.mp3"
             logger.info(f"Downloading Spotify Music: {output_filename}")
@@ -174,6 +184,7 @@ async def handle_spotify_request(message: Message, bot: Bot, input_text: Optiona
                     logger.info(f"Cleaning Download: {output_filename}")
                     clean_download(output_filename, cover_path)
                     return
+            
             user_info = (
                 f"<a href=\"tg://user?id={message.from_user.id}\">{user_name}</a>" if message.from_user
                 else f"<a href=\"https://t.me/{message.chat.username or 'this group'}\">{message.chat.title}</a>"
@@ -214,8 +225,9 @@ async def handle_spotify_request(message: Message, bot: Bot, input_text: Optiona
         await status.edit_text("<b>❌ Sorry Bro Spotify DL API Dead</b>", parse_mode=ParseMode.HTML)
         logger.error(f"Error processing Spotify request: {str(e)}")
         await Smart_Notify(bot, f"{BotCommands}sp", Exception(str(e)), status)
-        logger.info(f"Cleaning Download: {output_filename}")
-        clean_download(output_filename, cover_path)
+        if output_filename or cover_path:
+            logger.info(f"Cleaning Download: {output_filename}")
+            clean_download(output_filename, cover_path)
 
 @dp.message(Command(commands=["sp", "spotify"], prefix=BotCommands))
 @new_task
