@@ -123,6 +123,22 @@ responses = {
         "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Now</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
         {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
     ),
+    "message_to_txt": (
+        "<b>📄 Message → TXT Converter</b>\n"
+        "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+        "<b>USAGE:</b>\n"
+        "Convert any Telegram message (or multiple messages) into a clean TXT file.\n\n"
+        "➢ <b>/m2t filename</b> — Convert only the replied message.\n"
+        "   Example: <code>/m2t notes</code>\n\n"
+        "➢ <b>/m2t filename count</b> — Merge up to 25 messages.\n"
+        "   Example: <code>/m2t chat 5</code>\n\n"
+        "➢ <b>/m2t</b> — Auto filename, single message.\n"
+        "   Example: Reply to a message and type /m2t\n\n"
+        "✨ <b>Note:</b> You can Merge up to 25 messages\n"
+        "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+        "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Now</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
+    {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
+    ),
     "decoders": (
         "<b>🔤 Text and Encoding Utils ⚙️</b>\n"
         "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
