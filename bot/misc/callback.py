@@ -161,15 +161,15 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
             back_button.button(text="⭐️ Donate", callback_data="donate")
             back_button.button(text="⬅️ Back", callback_data="start_message", position="footer")
         elif call.data in ["ai_tools", "credit_cards", "crypto", "converter", "coupons", "decoders", "downloaders", "domain_check", "education_utils", "rembg"]:
-            back_button.button(text="Back", callback_data="main_menu")
+            back_button.button(text="⬅️ Back", callback_data="main_menu")
         elif call.data in ["file_to_link", "github", "info", "message_to_txt", "network_tools", "number_lookup", "pdf_tools", "qr_code", "url_shortner", "random_address"]:
-            back_button.button(text="Back", callback_data="second_menu")
+            back_button.button(text="⬅️ Back", callback_data="second_menu")
         elif call.data in ["string_session", "stripe_keys", "sticker", "stylish_text", "time_date", "text_split", "translate", "tempmail", "text_ocr", "bot_users_export"]:
-            back_button.button(text="Back", callback_data="third_menu")
+            back_button.button(text="⬅️ Back", callback_data="third_menu")
         elif call.data in ["web_capture", "weather", "yt_tools"]:
-            back_button.button(text="Back", callback_data="fourth_menu")
+            back_button.button(text="⬅️ Back", callback_data="fourth_menu")
         else:
-            back_button.button(text="Back", callback_data="main_menu")
+            back_button.button(text="⬅️ Back", callback_data="main_menu")
         back_button = back_button.build_menu(b_cols=3 if call.data == "about_me" else 1, h_cols=1, f_cols=1)
         await call.message.edit_text(
             text=responses[call.data][0],
@@ -183,6 +183,15 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
 
     elif call.data == "main_menu":
         await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=main_menu_keyboard)
+
+    elif call.data == "second_menu":
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=second_menu_keyboard)
+
+    elif call.data == "third_menu":
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=third_menu_keyboard)
+
+    elif call.data == "fourth_menu":
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=fourth_menu_keyboard)
 
     elif call.data == "next_1":
         await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=second_menu_keyboard)
