@@ -72,10 +72,9 @@ def get_initial_message() -> str:
         "• Email addresses → <code>mailto:email@example.com</code>\n"
         "• WiFi credentials → <code>WIFI:T:WPA;S:NetworkName;P:Password;;</code>\n"
         "• SMS messages → <code>smsto:+1234567890:Your message</code>\n"
-        "<• vCard contact info\n\n"
+        "• vCard contact info\n\n"
         "<b>🔢 Max Length:</b> <code>2953 characters</code>"
     )
-
 
 def get_settings_message(data: Dict) -> str:
     size_map = {"small": "📄 Small", "medium": "📄 Medium", "large": "📄 Large", "xlarge": "📄 Extra Large"}
