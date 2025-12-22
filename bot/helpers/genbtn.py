@@ -69,7 +69,7 @@ third_menu_keyboard.button(text="User Export", callback_data="bot_users_export")
 
 third_menu_keyboard.button(text="Previous ⬅️", callback_data="previous_2")
 third_menu_keyboard.button(text="Next ➡️", callback_data="next_3")
-
+third_menu_keyboard.button(text="Close ❌", callback_data="close")
 third_menu_keyboard = third_menu_keyboard.build_menu(b_cols=2, h_cols=1, f_cols=2)
 
 
@@ -684,7 +684,7 @@ responses = {
     ),
     "about_me": (
         "<b>Name:</b> Smart Util\n"
-        "<b>Version:</b> v75.0 (Beta) 🛠\n\n"
+        "<b>Version:</b> v60.0 (Beta) 🛠\n\n"
         "<b>Development Team:</b>\n"
         "- <b>Creator:</b> <a href='https://t.me/ISmartCoder'>Abir Arafat Chawdhury 👨‍💻</a>\n"
         "- <b>Contributor:</b> <a href='https://t.me/nkka404'>Nyein Ko Ko Aung 🤝</a>\n"
