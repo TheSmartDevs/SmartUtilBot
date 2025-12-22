@@ -4,50 +4,86 @@ from config import UPDATE_CHANNEL_URL
 from aiogram.enums import ParseMode
 
 main_menu_keyboard = SmartButtons()
+
 main_menu_keyboard.button(text="AI Tools", callback_data="ai_tools")
 main_menu_keyboard.button(text="CC Tools", callback_data="credit_cards")
+
 main_menu_keyboard.button(text="Crypto", callback_data="crypto")
 main_menu_keyboard.button(text="Converter", callback_data="converter")
+
 main_menu_keyboard.button(text="Coupons", callback_data="coupons")
 main_menu_keyboard.button(text="Decoders", callback_data="decoders")
+
 main_menu_keyboard.button(text="Downloaders", callback_data="downloaders")
 main_menu_keyboard.button(text="Domain Check", callback_data="domain_check")
+
 main_menu_keyboard.button(text="Education Utils", callback_data="education_utils")
 main_menu_keyboard.button(text="Editing Utils", callback_data="rembg")
+
 main_menu_keyboard.button(text="Next ➡️", callback_data="next_1")
 main_menu_keyboard.button(text="Close ❌", callback_data="close")
+
 main_menu_keyboard = main_menu_keyboard.build_menu(b_cols=2, h_cols=1, f_cols=2)
 
+
 second_menu_keyboard = SmartButtons()
+
 second_menu_keyboard.button(text="File To Link", callback_data="file_to_link")
 second_menu_keyboard.button(text="Github Utils", callback_data="github")
-second_menu_keyboard.button(text="Image To PDF", callback_data="image_to_pdf")
+
 second_menu_keyboard.button(text="Info", callback_data="info")
+second_menu_keyboard.button(text="Message To Text", callback_data="message_to_txt")
+
 second_menu_keyboard.button(text="Network Tools", callback_data="network_tools")
 second_menu_keyboard.button(text="Number Lookup", callback_data="number_lookup")
-second_menu_keyboard.button(text="QR Code", callback_data="qr_code")
+
+second_menu_keyboard.button(text="Pdf Tools", callback_data="pdf_tools")
+second_menu_keyboard.button(text="Qr Code", callback_data="qr_code")
+
 second_menu_keyboard.button(text="URL Shortner", callback_data="url_shortner")
 second_menu_keyboard.button(text="Random Address", callback_data="random_address")
-second_menu_keyboard.button(text="String Session", callback_data="string_session")
+
 second_menu_keyboard.button(text="Previous ⬅️", callback_data="previous_1")
 second_menu_keyboard.button(text="Next ➡️", callback_data="next_2")
 second_menu_keyboard.button(text="Close ❌", callback_data="close")
+
 second_menu_keyboard = second_menu_keyboard.build_menu(b_cols=2, h_cols=1, f_cols=3)
 
+
 third_menu_keyboard = SmartButtons()
+
+third_menu_keyboard.button(text="String Session", callback_data="string_session")
 third_menu_keyboard.button(text="Stripe Keys", callback_data="stripe_keys")
+
 third_menu_keyboard.button(text="Sticker", callback_data="sticker")
+third_menu_keyboard.button(text="Stylish Text", callback_data="stylish_text")
+
 third_menu_keyboard.button(text="Time Date", callback_data="time_date")
-third_menu_keyboard.button(text="Text Spilt", callback_data="text_split")
+third_menu_keyboard.button(text="Txt Spilt", callback_data="text_split")
+
 third_menu_keyboard.button(text="Translate", callback_data="translate")
 third_menu_keyboard.button(text="Temp Mail", callback_data="tempmail")
+
 third_menu_keyboard.button(text="Text OCR", callback_data="text_ocr")
 third_menu_keyboard.button(text="User Export", callback_data="bot_users_export")
-third_menu_keyboard.button(text="Web Capture", callback_data="web_capture")
-third_menu_keyboard.button(text="Yt Tools", callback_data="yt_tools")
+
 third_menu_keyboard.button(text="Previous ⬅️", callback_data="previous_2")
-third_menu_keyboard.button(text="Close ❌", callback_data="close")
+third_menu_keyboard.button(text="Next ➡️", callback_data="next_3")
+
 third_menu_keyboard = third_menu_keyboard.build_menu(b_cols=2, h_cols=1, f_cols=2)
+
+
+fourth_menu_keyboard = SmartButtons()
+
+fourth_menu_keyboard.button(text="Web Capture", callback_data="web_capture")
+fourth_menu_keyboard.button(text="Weather", callback_data="weather")
+
+fourth_menu_keyboard.button(text="YT Tools", callback_data="yt_tools")
+fourth_menu_keyboard.button(text="Previous ⬅️", callback_data="previous_3")
+
+fourth_menu_keyboard.button(text="Close ❌", callback_data="close")
+
+fourth_menu_keyboard = fourth_menu_keyboard.build_menu(b_cols=2, h_cols=1, f_cols=1)
 
 responses = {
     "ai_tools": (
@@ -406,7 +442,7 @@ responses = {
         "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Now</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
         {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
     ),
-    "image_to_pdf": (
+    "pdf_tools": (
         "<b>📄 PDF Tools</b>\n"
         "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
         "<b>📋 USAGE:</b>\n"
@@ -533,6 +569,20 @@ responses = {
         "2️⃣ Ensure the image is not blurry or distorted for accurate text extraction.\n\n"
         "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Now</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
         {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
+    ),
+    "stylish_text": (
+        "<b>✨ Stylish Text Generator</b>\n"
+        "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+        "<b>USAGE:</b>\n"
+        "Transform any text into beautiful, unique font styles.\n\n"
+        "➢ <b>/style Your Text Here</b>\n"
+        "Example: <code>/style Abir Arafat Chawdhury</code>\n\n"
+        "<b>🔤 Features:</b>\n"
+        "• 40+ Premium Font Styles\n"
+        "• Styled button previews\n"
+        "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+        "<b>🔔 Bot Updates</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Channel</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
+    {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
     ),
     "bot_users_export": (
         "<b>🤖 Bot Users Export</b>\n"
