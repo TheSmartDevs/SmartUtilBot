@@ -169,7 +169,7 @@ async def tx_handler(message: Message, bot: Bot):
         await Smart_Notify(bot, f"{BotCommands}tx", e, downloading_message)
         await downloading_message.edit_text("<b>Twitter Downloader API Dead</b>", parse_mode=ParseMode.HTML)
 
-@dp.message(Command(commands=["tx"], prefix=BotCommands))
+@dp.message(Command(commands=["tx", "x"], prefix=BotCommands))
 @new_task
 @SmartDefender
 async def tx_command(message: Message, bot: Bot):
