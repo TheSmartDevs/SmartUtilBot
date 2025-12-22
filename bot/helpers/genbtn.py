@@ -391,21 +391,20 @@ responses = {
         {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
     ),
     "image_to_pdf": (
-    "<b>📄 Image to PDF Maker</b>\n"
-    "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
-    "<b>📋 USAGE:</b>\n"
-    "Easily convert multiple images into a single professional PDF document.\n\n"
-    "➢ <b>/pdf [Title]</b> - Start a new PDF project\n\n"
-    "<b>⚙️ Features:</b>\n"
-    "• Upload up to 50 images (photos or documents)\n"
-    "• Add optional cover page and title\n"
-    "• Choose page size: A4 / Auto-fit\n"
-    "• High-quality output, fast generation\n\n"
-    "<b>⚠️ Notes:</b>\n"
-    "• Works only in private chat\n"
-    "• Supported: albums, single images, and document-mode images\n"
-    "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
-    "<b>🔔 For Bot Update News</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Now</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
+        "<b>📄 PDF Tools</b>\n"
+        "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+        "<b>📋 USAGE:</b>\n"
+        "Create, combine, and optimize PDF files easily   using the tools below.\n\n"
+        "🖼 <b>Image ➜ PDF:</b>\n"
+        "➢ <b>/pdf [Title]</b> - Create a PDF from multiple images\n\n"
+        "📚 <b>Merge PDFs:</b>\n"
+        "➢ <b>/mpdf</b> - Merge 2 or more PDF files into one\n\n"
+        "📦 <b>Compress PDF:</b>\n"
+        "➢ <b>/cpdf</b> - Reduce PDF file size while keeping quality\n\n"
+        "<b>⚠️ Notes:</b>\n"
+        "• All PDF tools work only in private chat\n"
+        "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
+        "<b>🔔 Bot Updates</b>: <a href='{UPDATE_CHANNEL_URL}'>Join Channel</a>".format(UPDATE_CHANNEL_URL=UPDATE_CHANNEL_URL),
     {'parse_mode': ParseMode.HTML, 'disable_web_page_preview': True}
     ),
     "number_lookup": (
