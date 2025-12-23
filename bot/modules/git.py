@@ -1,6 +1,5 @@
 # Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
+#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
 import os
 import aiohttp
 import aiofiles
