@@ -1,3 +1,5 @@
+#Copyright @ISmartCoder
+#Updates Channel @abirxdhackz
 import os
 import asyncio
 import base64
