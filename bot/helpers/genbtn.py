@@ -678,7 +678,7 @@ responses = {
     ),
     "about_me": (
         "<b>Name:</b> Smart Util\n"
-        "<b>Version:</b> v60.0 (Beta) 🛠\n\n"
+        "<b>Version:</b> v75.0 (Beta) 🛠\n\n"
         "<b>Development Team:</b>\n"
         "- <b>Creator:</b> <a href='https://t.me/ISmartCoder'>Abir Arafat Chawdhury 👨‍💻</a>\n"
         "- <b>Contributor:</b> <a href='https://t.me/nkka404'>Nyein Ko Ko Aung 🤝</a>\n"
