@@ -10,6 +10,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.enums import ParseMode, ChatType
 from pypdf import PdfReader, PdfWriter
+from pypdf.errors import FileNotDecryptedError
 
 from bot import dp
 from bot.helpers.botutils import send_message, delete_messages, get_args
@@ -38,7 +39,7 @@ class UserSession:
         self.message_id = None
         os.makedirs(self.user_dir, exist_ok=True)
         os.makedirs(DOWNLOADS_DIR, exist_ok=True)
-    
+
     def add_pdf(self, file_path: str, file_name: str, file_size: int, file_id: str):
         self.pdfs.append({
             'path': file_path,
@@ -47,16 +48,16 @@ class UserSession:
             'file_id': file_id
         })
         self.last_activity = datetime.now()
-    
+
     def is_duplicate(self, file_id: str) -> bool:
         for pdf in self.pdfs:
             if pdf['file_id'] == file_id:
                 return True
         return False
-    
+
     def get_total_size(self) -> int:
         return sum(pdf['size'] for pdf in self.pdfs)
-    
+
     def clear_pdfs(self):
         for pdf in self.pdfs:
             try:
@@ -68,7 +69,7 @@ class UserSession:
         self.pdfs = []
         self.custom_title = None
         self.awaiting_title = False
-    
+
     def cleanup(self):
         self.clear_pdfs()
         try:
@@ -112,15 +113,24 @@ def format_size(size_bytes: int) -> str:
 @SmartDefender
 async def mpdf_command(message: Message, bot: Bot):
     user_id = message.from_user.id
-    
+
+    if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        await send_message(
+            chat_id=message.chat.id,
+            text="<b>⚠️ PDF merge works only in private chat</b>",
+            parse_mode=ParseMode.HTML
+        )
+        LOGGER.info(f"User {user_id} tried to use PDF merge in group/supergroup")
+        return
+
     if user_id in user_sessions:
         user_sessions[user_id].cleanup()
         LOGGER.info(f"Cleaned up existing session for user {user_id}")
-    
+
     user_sessions[user_id] = UserSession(user_id)
-    
+
     LOGGER.info(f"User {user_id} started PDF merge session")
-    
+
     try:
         sent_msg = await send_message(
             chat_id=message.chat.id,
@@ -145,7 +155,7 @@ async def mpdf_command(message: Message, bot: Bot):
             reply_markup=get_keyboard(0),
             parse_mode=ParseMode.HTML
         )
-        
+
         user_sessions[user_id].message_id = sent_msg.message_id
         LOGGER.info(f"PDF Merger prompt sent to user {user_id}")
     except Exception as e:
@@ -157,7 +167,15 @@ async def mpdf_command(message: Message, bot: Bot):
 @SmartDefender
 async def handle_document(message: Message, bot: Bot):
     user_id = message.from_user.id
-    
+
+    if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        await send_message(
+            chat_id=message.chat.id,
+            text="<b>⚠️ PDF merge works only in private chat</b>",
+            parse_mode=ParseMode.HTML
+        )
+        return
+
     if user_id not in user_sessions:
         await send_message(
             chat_id=message.chat.id,
@@ -165,14 +183,14 @@ async def handle_document(message: Message, bot: Bot):
             parse_mode=ParseMode.HTML
         )
         return
-    
+
     session = user_sessions[user_id]
-    
+
     if session.awaiting_title:
         return
-    
+
     document = message.document
-    
+
     if not document.file_name.lower().endswith('.pdf'):
         await send_message(
             chat_id=message.chat.id,
@@ -180,7 +198,7 @@ async def handle_document(message: Message, bot: Bot):
             parse_mode=ParseMode.HTML
         )
         return
-    
+
     if document.file_size > MAX_FILE_SIZE:
         await send_message(
             chat_id=message.chat.id,
@@ -188,7 +206,7 @@ async def handle_document(message: Message, bot: Bot):
             parse_mode=ParseMode.HTML
         )
         return
-    
+
     if len(session.pdfs) >= MAX_PDFS:
         await send_message(
             chat_id=message.chat.id,
@@ -196,7 +214,7 @@ async def handle_document(message: Message, bot: Bot):
             parse_mode=ParseMode.HTML
         )
         return
-    
+
     if session.is_duplicate(document.file_id):
         await send_message(
             chat_id=message.chat.id,
@@ -205,32 +223,56 @@ async def handle_document(message: Message, bot: Bot):
         )
         LOGGER.info(f"User {user_id} tried to add duplicate PDF: {document.file_name}")
         return
-    
+
     download_msg = await send_message(
         chat_id=message.chat.id,
         text="<b>Downloading Received PDFs 📄...</b>",
         parse_mode=ParseMode.HTML
     )
-    
+
     try:
         os.makedirs(session.user_dir, exist_ok=True)
-        
+
         timestamp = int(time.time())
         safe_filename = document.file_name.rsplit('.', 1)[0].replace('/', '_').replace('\\', '_')
         file_path = os.path.join(session.user_dir, f"{safe_filename}_{timestamp}.pdf")
-        
+
         file = await bot.get_file(document.file_id)
         await bot.download_file(file.file_path, file_path)
-        
+
+        try:
+            reader = PdfReader(file_path)
+            if reader.is_encrypted:
+                await delete_messages(message.chat.id, download_msg.message_id)
+                await send_message(
+                    chat_id=message.chat.id,
+                    text="<b>❌ This PDF is password-protected and cannot be merged!</b>",
+                    parse_mode=ParseMode.HTML
+                )
+                if os.path.exists(file_path):
+                    clean_download(file_path)
+                return
+        except Exception as e:
+            await delete_messages(message.chat.id, download_msg.message_id)
+            await send_message(
+                chat_id=message.chat.id,
+                text="<b>❌ This PDF is corrupted or invalid!</b>",
+                parse_mode=ParseMode.HTML
+            )
+            if os.path.exists(file_path):
+                clean_download(file_path)
+            LOGGER.error(f"PDF validation error for user {user_id}: {e}")
+            return
+
         session.add_pdf(file_path, document.file_name, document.file_size, document.file_id)
-        
+
         await delete_messages(message.chat.id, download_msg.message_id)
-        
+
         pdf_count = len(session.pdfs)
         total_size = session.get_total_size()
-        
+
         LOGGER.info(f"User {user_id} added PDF: {document.file_name} ({format_size(document.file_size)})")
-        
+
         success_msg = await send_message(
             chat_id=message.chat.id,
             text=(
@@ -244,15 +286,15 @@ async def handle_document(message: Message, bot: Bot):
             reply_markup=get_keyboard(pdf_count),
             parse_mode=ParseMode.HTML
         )
-        
+
         if session.message_id:
             try:
                 await delete_messages(message.chat.id, session.message_id)
             except:
                 pass
-        
+
         session.message_id = success_msg.message_id
-        
+
     except Exception as e:
         await Smart_Notify(bot, "handle_document", e, message)
         LOGGER.error(f"Error downloading PDF for user {user_id}: {e}")
@@ -268,26 +310,29 @@ async def handle_document(message: Message, bot: Bot):
 @SmartDefender
 async def handle_text(message: Message, bot: Bot):
     user_id = message.from_user.id
-    
+
+    if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        return
+
     if user_id not in user_sessions:
         return
-    
+
     session = user_sessions[user_id]
-    
+
     if session.awaiting_title:
         title = message.text.strip()
         session.custom_title = title
         session.awaiting_title = False
-        
+
         LOGGER.info(f"User {user_id} set custom title: {title}")
-        
+
         await delete_messages(message.chat.id, message.message_id)
-        
+
         pdf_count = len(session.pdfs)
         total_size = session.get_total_size()
-        
+
         last_pdf = session.pdfs[-1] if session.pdfs else None
-        
+
         try:
             await bot.edit_message_text(
                 chat_id=message.chat.id,
@@ -312,21 +357,21 @@ async def handle_text(message: Message, bot: Bot):
 async def handle_callback(callback: CallbackQuery, bot: Bot):
     user_id = callback.from_user.id
     data = callback.data
-    
+
     LOGGER.info(f"User {user_id} clicked button: {data}")
-    
+
     if user_id not in user_sessions:
         await callback.answer("Session expired! Use /mpdf to start again.", show_alert=True)
         return
-    
+
     session = user_sessions[user_id]
     pdf_count = len(session.pdfs)
-    
+
     try:
         if data.startswith("pdf_count:"):
             await callback.answer(f"You Have Added {pdf_count}/10 PDFs")
             return
-        
+
         if data == "clear_all":
             session.clear_pdfs()
             LOGGER.info(f"User {user_id} cleared all PDFs")
@@ -337,7 +382,7 @@ async def handle_callback(callback: CallbackQuery, bot: Bot):
                 parse_mode=ParseMode.HTML
             )
             return
-        
+
         if data == "cancel":
             session.cleanup()
             del user_sessions[user_id]
@@ -348,15 +393,15 @@ async def handle_callback(callback: CallbackQuery, bot: Bot):
             )
             await callback.answer()
             return
-        
+
         if pdf_count < 2 and data in ["reorder", "set_title", "merge_now"]:
             await callback.answer("Please Atleast Add 2 PDFs ❌", show_alert=True)
             return
-        
+
         if data == "reorder":
             await callback.answer("Reorder feature coming soon!", show_alert=True)
             return
-        
+
         if data == "set_title":
             session.awaiting_title = True
             await callback.message.edit_text(
@@ -372,7 +417,7 @@ async def handle_callback(callback: CallbackQuery, bot: Bot):
             )
             await callback.answer()
             return
-        
+
         if data == "cancel_title":
             session.awaiting_title = False
             total_size = session.get_total_size()
@@ -389,48 +434,73 @@ async def handle_callback(callback: CallbackQuery, bot: Bot):
             )
             await callback.answer()
             return
-        
+
         if data == "merge_now":
             await callback.message.delete()
-            
+
             merge_msg = await send_message(
                 chat_id=callback.message.chat.id,
                 text="<b>Merging Your PDFs.....🕣</b>",
                 parse_mode=ParseMode.HTML
             )
-            
+
             try:
                 start_time = time.time()
-                
+
                 merger = PdfWriter()
-                
+
                 for pdf in session.pdfs:
                     LOGGER.info(f"Adding PDF to merger: {pdf['path']}")
-                    reader = PdfReader(pdf['path'])
-                    for page in reader.pages:
-                        merger.add_page(page)
-                
+                    try:
+                        reader = PdfReader(pdf['path'])
+                        if reader.is_encrypted:
+                            await merge_msg.edit_text(
+                                f"<b>❌ Cannot merge: '{pdf['name']}' is password-protected!</b>",
+                                parse_mode=ParseMode.HTML
+                            )
+                            session.cleanup()
+                            del user_sessions[user_id]
+                            return
+                        for page in reader.pages:
+                            merger.add_page(page)
+                    except FileNotDecryptedError:
+                        await merge_msg.edit_text(
+                            f"<b>❌ Cannot merge: '{pdf['name']}' is encrypted!</b>",
+                            parse_mode=ParseMode.HTML
+                        )
+                        session.cleanup()
+                        del user_sessions[user_id]
+                        return
+                    except Exception as e:
+                        await merge_msg.edit_text(
+                            f"<b>❌ Error reading '{pdf['name']}': {str(e)}</b>",
+                            parse_mode=ParseMode.HTML
+                        )
+                        session.cleanup()
+                        del user_sessions[user_id]
+                        return
+
                 output_filename = session.custom_title if session.custom_title else f"Merged_PDF_{int(datetime.now().timestamp())}"
                 if not output_filename.endswith('.pdf'):
                     output_filename += '.pdf'
-                
+
                 output_path = os.path.join(session.user_dir, output_filename)
-                
+
                 with open(output_path, 'wb') as output_file:
                     merger.write(output_file)
-                
+
                 merger.close()
-                
+
                 LOGGER.info(f"User {user_id} merged {pdf_count} PDFs into {output_filename}")
-                
+
                 await merge_msg.edit_text(
                     "<b>Uploading On Telegram....🌐</b>",
                     parse_mode=ParseMode.HTML
                 )
-                
+
                 file_size = os.path.getsize(output_path)
                 time_taken = time.time() - start_time
-                
+
                 await bot.send_document(
                     chat_id=callback.message.chat.id,
                     document=FSInputFile(output_path, filename=output_filename),
@@ -443,28 +513,28 @@ async def handle_callback(callback: CallbackQuery, bot: Bot):
                     ),
                     parse_mode=ParseMode.HTML
                 )
-                
+
                 await delete_messages(callback.message.chat.id, merge_msg.message_id)
-                
+
                 if os.path.exists(output_path):
                     try:
                         clean_download(output_path)
                         LOGGER.info(f"Deleted merged output file: {output_path}")
                     except Exception as e:
                         LOGGER.error(f"Error deleting output file: {e}")
-                
+
                 session.cleanup()
                 del user_sessions[user_id]
-                
+
                 LOGGER.info(f"User {user_id} session cleaned up successfully")
-                
+
             except Exception as e:
                 await Smart_Notify(bot, "merge_now", e)
                 LOGGER.error(f"Error merging PDFs for user {user_id}: {e}")
                 await merge_msg.edit_text(f"❌ Error merging PDFs: {str(e)}")
                 session.cleanup()
                 del user_sessions[user_id]
-    
+
     except Exception as e:
         await Smart_Notify(bot, "handle_callback", e)
         LOGGER.error(f"Error handling callback for user {user_id}: {e}")
