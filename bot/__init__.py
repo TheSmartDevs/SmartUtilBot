@@ -22,7 +22,8 @@ SmartPyro = Client(
     name="SmartUtilBot",
     api_id=API_ID,
     api_hash=API_HASH,
-    bot_token=BOT_TOKEN
+    bot_token=BOT_TOKEN,
+    workers=1000
 )
 LOGGER.info("Creating User Client From SESSION_STRING")
 SmartUserBot = Client(
@@ -30,7 +31,7 @@ SmartUserBot = Client(
     api_id=API_ID,
     api_hash=API_HASH,
     session_string=SESSION_STRING,
-    workers=10
+    workers=1000
 )
 LOGGER.info("User Client Created Successfully !")
 LOGGER.info("Bot Client Created Successfully!")
