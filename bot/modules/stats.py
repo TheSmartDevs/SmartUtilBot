@@ -1,9 +1,10 @@
 import asyncio
 from datetime import datetime, timedelta
-from aiogram import Bot
+from typing import Callable, Dict, Any, Awaitable
+from aiogram import Bot, BaseMiddleware
 from aiogram.enums import ChatType
 from aiogram.filters import Command, ChatMemberUpdatedFilter
-from aiogram.types import Message, ChatMemberUpdated
+from aiogram.types import Message, ChatMemberUpdated, TelegramObject
 from pyrogram import Client
 from pyrogram.enums import ParseMode as SmartParseMode, ChatType as PyrogramChatType
 from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated, ChatWriteForbidden, PeerIdInvalid
@@ -18,6 +19,71 @@ from bot.helpers.guard import admin_only
 from bot.core.mongo import SmartUsers
 from config import UPDATE_CHANNEL_URL
 import re
+
+
+class UserActivityMiddleware(BaseMiddleware):
+    
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: Dict[str, Any]
+    ) -> Any:
+        if isinstance(event, Message):
+            await self.track_activity(event)
+        
+        return await handler(event, data)
+    
+    async def track_activity(self, message: Message):
+        try:
+            if message.from_user and not message.from_user.is_bot:
+                user_id = message.from_user.id
+                chat_id = message.chat.id
+                is_group = message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]
+                
+                await self.update_user_activity(user_id, chat_id, is_group)
+        except Exception as e:
+            LOGGER.error(f"Error in UserActivityMiddleware: {str(e)}")
+    
+    async def update_user_activity(self, user_id: int, chat_id: int, is_group: bool):
+        try:
+            now = datetime.utcnow()
+            
+            user_update_data = {
+                "$set": {
+                    "user_id": user_id,
+                    "last_activity": now,
+                    "is_group": False
+                },
+                "$inc": {"activity_count": 1}
+            }
+            await SmartUsers.update_one(
+                {"user_id": user_id, "is_group": False},
+                user_update_data,
+                upsert=True
+            )
+            LOGGER.debug(f"Middleware: Updated user activity for user_id {user_id}")
+            
+            if is_group and chat_id != user_id:
+                group_update_data = {
+                    "$set": {
+                        "user_id": chat_id,
+                        "last_activity": now,
+                        "is_group": True
+                    },
+                    "$inc": {"activity_count": 1}
+                }
+                await SmartUsers.update_one(
+                    {"user_id": chat_id, "is_group": True},
+                    group_update_data,
+                    upsert=True
+                )
+                LOGGER.debug(f"Middleware: Updated group activity for chat_id {chat_id}")
+        except Exception as e:
+            LOGGER.error(f"Middleware: Error updating activity for user_id {user_id}, chat_id {chat_id}: {str(e)}")
+
+
+dp.message.middleware(UserActivityMiddleware())
 
 
 async def update_user_activity(user_id: int, chat_id: int = None, is_group: bool = False):
