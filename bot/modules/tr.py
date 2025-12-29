@@ -7,7 +7,8 @@ from aiogram.filters import Command
 from aiogram.types import Message, FSInputFile
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from bot import dp
 from bot.helpers.utils import new_task, clean_download
 from bot.helpers.botutils import send_message, delete_messages, get_args
@@ -22,8 +23,8 @@ DOWNLOAD_DIRECTORY = "./downloads/"
 if not os.path.exists(DOWNLOAD_DIRECTORY):
     os.makedirs(DOWNLOAD_DIRECTORY)
 
-genai.configure(api_key=TRANS_API_KEY)
-model = genai.GenerativeModel(MODEL_NAME)
+client = genai.Client(api_key=TRANS_API_KEY)
+
 
 async def ocr_extract_text(bot: Bot, message: Message):
     photo_path = None
@@ -50,21 +51,35 @@ async def ocr_extract_text(bot: Bot, message: Message):
             raise ValueError("Downloaded file is empty")
         if os.path.getsize(photo_path) > IMGAI_SIZE_LIMIT:
             raise ValueError(f"Image too large. Max {IMGAI_SIZE_LIMIT/1000000}MB allowed")
-        with Image.open(photo_path) as img:
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            response = await asyncio.get_event_loop().run_in_executor(None, lambda: model.generate_content(["Extract only the main text from this image, ignoring any labels or additional comments, and return it as plain text", img]))
-            text = response.text
-            if not text:
-                return ""
-            else:
-                return text.strip()
+        
+        with open(photo_path, 'rb') as image_file:
+            image_data = image_file.read()
+        
+        response = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: client.models.generate_content(
+                model=MODEL_NAME,
+                contents=[
+                    types.Part.from_text("Extract only the main text from this image, ignoring any labels or additional comments, and return it as plain text"),
+                    types.Part.from_bytes(
+                        data=image_data,
+                        mime_type="image/jpeg"
+                    )
+                ]
+            )
+        )
+        text = response.text
+        if not text:
+            return ""
+        else:
+            return text.strip()
     except Exception as e:
         await Smart_Notify(bot, "tr ocr", e, message)
         raise
     finally:
         if photo_path and os.path.exists(photo_path):
             clean_download(photo_path)
+
 
 async def translate_text(text, target_lang):
     try:
@@ -81,11 +96,13 @@ async def translate_text(text, target_lang):
     except Exception as e:
         raise
 
+
 async def format_text(text):
     if not text:
         return ""
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     return '\n'.join(lines)
+
 
 @dp.message(Command(commands=["tr"], prefix=BotCommands))
 @new_task
