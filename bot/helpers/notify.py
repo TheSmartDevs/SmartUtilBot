@@ -1,6 +1,5 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
 import traceback
+import html
 from datetime import datetime
 from typing import Optional, Union
 from aiogram import Bot
@@ -13,6 +12,7 @@ from bot.helpers.logger import LOGGER
 from config import OWNER_ID, DEVELOPER_USER_ID, LOG_CHANNEL_ID, UPDATE_CHANNEL_URL
 
 TRACEBACK_DATA = {}
+
 
 async def check_channel_membership(bot: Bot, user_id: int) -> tuple[bool, str, Optional[int]]:
     try:
@@ -35,13 +35,13 @@ async def check_channel_membership(bot: Bot, user_id: int) -> tuple[bool, str, O
                 channel_id = int(f"-100{abs(channel_id)}")
 
         result = await bot.get_chat_member(chat_id=channel_id, user_id=user_id)
-        
+
         valid_statuses = [
             ChatMemberStatus.MEMBER, 
             ChatMemberStatus.ADMINISTRATOR, 
             ChatMemberStatus.CREATOR
         ]
-        
+
         if hasattr(result, 'status') and result.status in valid_statuses:
             return True, "", channel_id
         elif str(type(result).__name__) in ["ChatMemberOwner", "ChatMemberAdministrator", "ChatMemberMember"]:
@@ -62,6 +62,7 @@ async def check_channel_membership(bot: Bot, user_id: int) -> tuple[bool, str, O
         else:
             return False, f"Failed to check membership: {str(e)}", None
 
+
 async def Smart_Notify(bot: Bot, command: str, error: Union[Exception, str], message: Optional[Message] = None) -> None:
     try:
         bot_info = await bot.get_me()
@@ -73,26 +74,33 @@ async def Smart_Notify(bot: Bot, command: str, error: Union[Exception, str], mes
         chat_id_user = "N/A"
         if message and message.from_user:
             user = message.from_user
-            full_name = f"{user.first_name} {user.last_name or ''}".strip()
+            first_name = user.first_name or ''
+            last_name = user.last_name or ''
+            full_name = f"{first_name} {last_name}".strip()
+            full_name_escaped = html.escape(full_name) if full_name else "Unknown"
+            username_display = f"@{user.username}" if user.username else "N/A"
+            
             user_info = {
                 'id': user.id,
-                'mention': f"<a href='tg://user?id={user.id}'>{full_name}</a>",
-                'username': f"@{user.username}" if user.username else "N/A",
-                'full_name': full_name
+                'mention': f"<a href='tg://user?id={user.id}'>{full_name_escaped}</a>",
+                'username': username_display,
+                'full_name': full_name_escaped
             }
             chat_id_user = getattr(message.chat, 'id', "N/A")
 
         if isinstance(error, str):
             error_type = "StringError"
-            error_message = error
+            error_message = html.escape(error)
             traceback_text = "N/A"
             error_level = "WARNING"
         else:
             error_type = type(error).__name__
-            error_message = str(error)
+            error_message = html.escape(str(error))
             traceback_text = "".join(traceback.format_exception(type(error), error, error.__traceback__)) if error.__traceback__ else "N/A"
             error_level = "WARNING" if isinstance(error, (ValueError, UserWarning)) else "ERROR" if isinstance(error, RuntimeError) else "CRITICAL"
 
+        command_escaped = html.escape(command)
+        
         now = datetime.now()
         full_timestamp = now.strftime('%d-%m-%Y %H:%M:%S %p')
         formatted_date = now.strftime('%d-%m-%Y')
@@ -103,7 +111,7 @@ async def Smart_Notify(bot: Bot, command: str, error: Union[Exception, str], mes
             'error_level': error_level,
             'traceback_text': traceback_text,
             'full_timestamp': full_timestamp,
-            'command': command,
+            'command': command_escaped,
             'error_message': error_message,
             'user_info': user_info,
             'chat_id': chat_id_user,
@@ -114,7 +122,7 @@ async def Smart_Notify(bot: Bot, command: str, error: Union[Exception, str], mes
         error_report = (
             "<b>🚨 Smart Util ⚙️ New Bug Report</b>\n"
             "<b>━━━━━━━━━━━━━━━━</b>\n"
-            f"<b>🧩 Command:</b> {command}\n"
+            f"<b>🧩 Command:</b> {command_escaped}\n"
             f"<b>👤 User:</b> {user_info['mention']}\n"
             f"<b>⚡️ User ID:</b> <code>{user_info['id']}</code>\n"
             f"<b>📍 Chat:</b> {chat_id_user}\n"
@@ -145,7 +153,7 @@ async def Smart_Notify(bot: Bot, command: str, error: Union[Exception, str], mes
             minimal_report = (
                 "<b>🚨 Smart Util ⚙️ New Bug Report</b>\n"
                 "<b>━━━━━━━━━━━━━━━━</b>\n"
-                f"<b>🧩 Command:</b> {command}\n"
+                f"<b>🧩 Command:</b> {command_escaped}\n"
                 f"<b>👤 User:</b> {user_info['mention']}\n"
                 f"<b>⚡️ User ID:</b> <code>{user_info['id']}</code>\n"
                 f"<b>📍 Chat:</b> {chat_id_user}\n"
@@ -172,6 +180,7 @@ async def Smart_Notify(bot: Bot, command: str, error: Union[Exception, str], mes
     except Exception as e:
         LOGGER.error(f"Failed to send admin notification: {e}")
         LOGGER.error(traceback.format_exc())
+
 
 @dp.callback_query(lambda c: c.data.startswith("viewtrcbc"))
 async def handle_traceback_callback(callback_query):
@@ -225,6 +234,7 @@ async def handle_traceback_callback(callback_query):
         except:
             pass
 
+
 @dp.callback_query(lambda c: c.data.startswith("backtosummary"))
 async def handle_back_callback(callback_query):
     try:
@@ -273,6 +283,7 @@ async def handle_back_callback(callback_query):
         except:
             pass
 
+
 def cleanup_old_traceback_data():
     try:
         current_time = datetime.now().timestamp() * 1000000
@@ -290,6 +301,7 @@ def cleanup_old_traceback_data():
             LOGGER.info(f"Cleaned up {len(keys_to_remove)} old traceback entries")
     except Exception as e:
         LOGGER.error(f"Error in cleanup: {e}")
+
 
 try:
     cleanup_old_traceback_data()
