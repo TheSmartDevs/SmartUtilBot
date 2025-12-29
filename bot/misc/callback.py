@@ -43,7 +43,7 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
         back_button = SmartButtons()
         back_button.button(text="⬅️ Back", callback_data="fstats")
         back_button = back_button.build_menu(b_cols=1, h_cols=1, f_cols=1)
-        await call.message.edit_text(stats_text, parse_mode=ParseMode.HTML, reply_markup=back_button)
+        await call.message.edit_text(stats_text, parse_mode=ParseMode.HTML, reply_markup=back_button, disable_web_page_preview=True)
         return
 
     if call.data == "fstats":
@@ -64,7 +64,7 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
         stats_dashboard_buttons.button(text="🏆 Top Users", callback_data="top_users_1")
         stats_dashboard_buttons.button(text="⬅️ Back", callback_data="about_me")
         stats_dashboard_buttons = stats_dashboard_buttons.build_menu(b_cols=2, h_cols=1, f_cols=1)
-        await call.message.edit_text(stats_dashboard_text, parse_mode=ParseMode.HTML, reply_markup=stats_dashboard_buttons)
+        await call.message.edit_text(stats_dashboard_text, parse_mode=ParseMode.HTML, reply_markup=stats_dashboard_buttons, disable_web_page_preview=True)
         return
 
     if call.data.startswith("top_users_"):
@@ -106,49 +106,46 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
         else:
             top_users_buttons.button(text="⬅️ Back", callback_data="fstats")
         top_users_buttons = top_users_buttons.build_menu(b_cols=2 if page != total_pages else 1, h_cols=1, f_cols=1)
-        await call.message.edit_text(top_users_text, parse_mode=ParseMode.HTML, reply_markup=top_users_buttons)
+        await call.message.edit_text(top_users_text, parse_mode=ParseMode.HTML, reply_markup=top_users_buttons, disable_web_page_preview=True)
         return
 
     if call.data == "server":
-        ping_output = subprocess.getoutput("ping -c 1 google.com")
-        ping = ping_output.split("time=")[1].split()[0] if "time=" in ping_output else "N/A"
+        try:
+            ping_output = subprocess.getoutput("ping -c 1 google.com")
+            ping = ping_output.split("time=")[1].split()[0] if "time=" in ping_output else "N/A"
+        except:
+            ping = "N/A"
+
         disk = psutil.disk_usage('/')
         total_disk = disk.total / (2**30)
         used_disk = disk.used / (2**30)
         free_disk = disk.free / (2**30)
         mem = psutil.virtual_memory()
-        boot_time = psutil.boot_time()
-        uptime_seconds = time.time() - boot_time
-        from bot.helpers.donateutils import timeof_fmt
-        uptime = timeof_fmt(uptime_seconds)
-        swap = psutil.swap_memory()
         total_mem = mem.total / (2**30)
         used_mem = mem.used / (2**30)
         available_mem = mem.available / (2**30)
+        cpu_percent = psutil.cpu_percent(interval=1)
+
         server_status_text = (
-            f"<b>Smart Bot Status ⇾ Report ✅</b>\n"
-            f"<b>━━━━━━━━━━━━━</b>\n"
-            f"<b>Server Connection:</b>\n"
-            f"<b>- Ping:</b> {ping} ms\n"
-            f"<b>- Bot Status:</b> Online\n"
-            f"<b>- Server Uptime:</b> {uptime}\n"
-            f"<b>━━━━━━━━━━━━━</b>\n"
-            f"<b>Server Storage:</b>\n"
+            f"<b>⚙️ Server Status Report</b>\n"
+            f"<b>━━━━━━━━━━━━━━━</b>\n"
+            f"<b>🛜 Connectivity:</b>\n"
+            f"<b>- Ping:</b> {ping}\n"
+            f"<b>- Status:</b> Online\n"
+            f"<b>- CPU Load:</b> {cpu_percent}%\n\n"
+            f"<b>💾 Server Storage:</b>\n"
             f"<b>- Total:</b> {total_disk:.2f} GB\n"
             f"<b>- Used:</b> {used_disk:.2f} GB\n"
-            f"<b>- Available:</b> {free_disk:.2f} GB\n"
-            f"<b>━━━━━━━━━━━━━</b>\n"
-            f"<b>Memory Usage:</b>\n"
+            f"<b>- Available:</b> {free_disk:.2f} GB\n\n"
+            f"<b>🧠 Memory Usage:</b>\n"
             f"<b>- Total:</b> {total_mem:.2f} GB\n"
             f"<b>- Used:</b> {used_mem:.2f} GB\n"
-            f"<b>- Available:</b> {available_mem:.2f} GB\n"
-            f"<b>━━━━━━━━━━━━━</b>\n"
-            f"<b>Server Stats Check Successful ✅</b>"
+            f"<b>- Available:</b> {available_mem:.2f} GB"
         )
         back_button = SmartButtons()
         back_button.button(text="⬅️ Back", callback_data="about_me")
         back_button = back_button.build_menu(b_cols=1, h_cols=1, f_cols=1)
-        await call.message.edit_text(server_status_text, parse_mode=ParseMode.HTML, reply_markup=back_button)
+        await call.message.edit_text(server_status_text, parse_mode=ParseMode.HTML, reply_markup=back_button, disable_web_page_preview=True)
         return
 
     if call.data in responses:
@@ -176,7 +173,7 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
         await call.message.edit_text(
             text=responses[call.data][0],
             parse_mode=responses[call.data][1]['parse_mode'],
-            disable_web_page_preview=responses[call.data][1]['disable_web_page_preview'],
+            disable_web_page_preview=True,
             reply_markup=back_button
         )
 
@@ -184,34 +181,34 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
         await handle_donate_callback(bot, call)
 
     elif call.data == "main_menu":
-        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=main_menu_keyboard)
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=main_menu_keyboard, disable_web_page_preview=True)
 
     elif call.data == "second_menu":
-        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=second_menu_keyboard)
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=second_menu_keyboard, disable_web_page_preview=True)
 
     elif call.data == "third_menu":
-        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=third_menu_keyboard)
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=third_menu_keyboard, disable_web_page_preview=True)
 
     elif call.data == "fourth_menu":
-        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=fourth_menu_keyboard)
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=fourth_menu_keyboard, disable_web_page_preview=True)
 
     elif call.data == "next_1":
-        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=second_menu_keyboard)
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=second_menu_keyboard, disable_web_page_preview=True)
 
     elif call.data == "next_2":
-        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=third_menu_keyboard)
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=third_menu_keyboard, disable_web_page_preview=True)
 
     elif call.data == "next_3":
-        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=fourth_menu_keyboard)
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=fourth_menu_keyboard, disable_web_page_preview=True)
 
     elif call.data == "previous_1":
-        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=main_menu_keyboard)
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=main_menu_keyboard, disable_web_page_preview=True)
 
     elif call.data == "previous_2":
-        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=second_menu_keyboard)
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=second_menu_keyboard, disable_web_page_preview=True)
 
     elif call.data == "previous_3":
-        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=third_menu_keyboard)
+        await call.message.edit_text("<b>Here are the Smart-Util Options: 👇</b>", parse_mode=ParseMode.HTML, reply_markup=third_menu_keyboard, disable_web_page_preview=True)
 
     elif call.data == "close":
         await call.message.delete()
@@ -254,7 +251,7 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
         policy_terms_button.button(text="Terms & Conditions", callback_data="terms_conditions")
         policy_terms_button.button(text="⬅️ Back", callback_data="start_message")
         policy_terms_button = policy_terms_button.build_menu(b_cols=2, h_cols=1, f_cols=1)
-        await call.message.edit_text(policy_terms_text, parse_mode=ParseMode.HTML, reply_markup=policy_terms_button)
+        await call.message.edit_text(policy_terms_text, parse_mode=ParseMode.HTML, reply_markup=policy_terms_button, disable_web_page_preview=True)
 
     elif call.data == "privacy_policy":
         privacy_policy_text = (
@@ -276,9 +273,10 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
         back_button = SmartButtons()
         back_button.button(text="⬅️ Back", callback_data="policy_terms")
         back_button = back_button.build_menu(b_cols=1, h_cols=1, f_cols=1)
-        await call.message.edit_text(privacy_policy_text, parse_mode=ParseMode.HTML, reply_markup=back_button)
+        await call.message.edit_text(privacy_policy_text, parse_mode=ParseMode.HTML, reply_markup=back_button, disable_web_page_preview=True)
 
     elif call.data == "terms_conditions":
+        dev_name = html.escape("ᴀʙɪʀ ᴀʀᴀꜰᴀᴛ ᴄʜᴀᴡᴅʜᴜʀʏ </🇧🇩>")
         terms_conditions_text = (
             f"<b>📜 Terms & Conditions for Smart Util</b>\n\n"
             f"Welcome to <b>Smart Util</b>. By using our services, you accept these <b>Terms & Conditions</b>.\n\n"
@@ -302,10 +300,10 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
             f"<b>6. Termination</b>\n"
             f"   - Violations may lead to user ban or service suspension without prior notice.\n\n"
             f"<b>7. Contact Information</b>\n"
-            f"   - For concerns, contact  <a href=\"https://t.me/ISmartCoder\">ᴀʙɪʀ ᴀʀᴀꜰᴀᴛ ᴄʜᴀᴡᴅʜᴜʀʏ 🇧🇩</a>\n\n"
+            f"   - For concerns, contact  <a href=\"https://t.me/ISmartCoder\">{dev_name}</a>\n\n"
             f"Thank you for using <b>Smart Util</b>. Your privacy, safety, and experience matter most. 🚀"
         )
         back_button = SmartButtons()
         back_button.button(text="⬅️ Back", callback_data="policy_terms")
         back_button = back_button.build_menu(b_cols=1, h_cols=1, f_cols=1)
-        await call.message.edit_text(terms_conditions_text, parse_mode=ParseMode.HTML, reply_markup=back_button)
+        await call.message.edit_text(terms_conditions_text, parse_mode=ParseMode.HTML, reply_markup=back_button, disable_web_page_preview=True)
