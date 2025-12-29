@@ -13,12 +13,13 @@ from bot.helpers.utils import new_task
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.defend import SmartDefender
 from config import GOOGLE_API_KEY, MODEL_NAME, IMGAI_SIZE_LIMIT
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from PIL import Image
 import re
 
-genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel(MODEL_NAME)
+client = genai.Client(api_key=GOOGLE_API_KEY)
+
 
 def escape_html(text):
     html_escape_table = {
@@ -30,6 +31,7 @@ def escape_html(text):
         "'": "&apos;"
     }
     return "".join(html_escape_table.get(c, c) for c in text)
+
 
 def format_code_response(text):
     replacements = [
@@ -59,6 +61,7 @@ def format_code_response(text):
     text = re.sub(r'<\?[\s\S]*?\?>', '', text)
     return text
 
+
 @dp.message(Command(commands=["gem", "gemi", "gemini"], prefix=BotCommands))
 @new_task
 @SmartDefender
@@ -84,7 +87,10 @@ async def gemi_handler(message: Message, bot: Bot):
             )
             LOGGER.info(f"Prompt missing for Gemini command in chat {message.chat.id}")
             return
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt
+        )
         response_text = response.text
         formatted_text = format_code_response(response_text)
         if len(formatted_text) > 4096:
@@ -156,6 +162,7 @@ async def gemi_handler(message: Message, bot: Bot):
             )
             LOGGER.info(f"Sent Gemini error message to chat {message.chat.id}")
 
+
 @dp.message(Command(commands=["imgai"], prefix=BotCommands))
 @new_task
 @SmartDefender
@@ -192,7 +199,20 @@ async def imgai_handler(message: Message, bot: Bot):
                     img = img.convert('RGB')
                 command_text = message.text.split(maxsplit=1)
                 user_prompt = command_text[1] if len(command_text) > 1 else "Describe this image in detail"
-                response = model.generate_content([user_prompt, img])
+                
+                with open(photo_path, 'rb') as image_file:
+                    image_data = image_file.read()
+                
+                response = client.models.generate_content(
+                    model=MODEL_NAME,
+                    contents=[
+                        types.Part.from_text(user_prompt),
+                        types.Part.from_bytes(
+                            data=image_data,
+                            mime_type="image/jpeg"
+                        )
+                    ]
+                )
                 analysis = response.text
                 formatted_text = format_code_response(analysis)
                 if len(formatted_text) > 4096:
