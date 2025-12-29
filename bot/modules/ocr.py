@@ -1,11 +1,11 @@
-#Copyright @ISmartCoder
-#Updates Channel @abirxdhackz
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from PIL import Image
 from aiogram import Bot
 from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.enums import ParseMode, ChatType
+from aiogram.exceptions import TelegramBadRequest
 from bot import dp, SmartAIO
 from bot.helpers.utils import new_task, clean_download
 from bot.helpers.botutils import send_message, delete_messages
@@ -22,8 +22,8 @@ from pygments.formatters import HtmlFormatter
 import os
 
 logger = LOGGER
-genai.configure(api_key=OCR_API_KEY)
-model = genai.GenerativeModel(MODEL_NAME)
+client = genai.Client(api_key=OCR_API_KEY)
+
 
 def escape_html(text):
     html_escape_table = {
@@ -35,6 +35,7 @@ def escape_html(text):
         "'": "&apos;"
     }
     return "".join(html_escape_table.get(c, c) for c in text)
+
 
 def format_code_response(text):
     replacements = [
@@ -99,6 +100,7 @@ def format_code_response(text):
 
     return text
 
+
 @dp.message(Command(commands=["ocr"], prefix=BotCommands))
 @new_task
 @SmartDefender
@@ -149,66 +151,75 @@ async def ocr_handler(message: Message, bot: Bot):
         )
 
         logger.info(f"Processing OCR: downloads/ocr_temp_{file_serial}")
-        with Image.open(photo_path) as img:
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            response = model.generate_content(["Extract text from this image of all lang Just Send The Extracted Text No Extra Text Or Hi Hello", img])
-            text = response.text
-            logger.info(f"OCR Response: {text}")
+        with open(photo_path, 'rb') as image_file:
+            image_data = image_file.read()
+        
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=[
+                types.Part.from_text("Extract text from this image of all lang Just Send The Extracted Text No Extra Text Or Hi Hello"),
+                types.Part.from_bytes(
+                    data=image_data,
+                    mime_type="image/jpeg"
+                )
+            ]
+        )
+        text = response.text
+        logger.info(f"OCR Response: {text}")
 
-            response_text = text if text else "<b>❌ No readable text found in image.</b>"
-            formatted_text = format_code_response(response_text)
-            if len(formatted_text) > 4096:
+        response_text = text if text else "<b>❌ No readable text found in image.</b>"
+        formatted_text = format_code_response(response_text)
+        if len(formatted_text) > 4096:
+            await delete_messages(
+                chat_id=message.chat.id,
+                message_ids=[processing_msg.message_id]
+            )
+            parts = []
+            current_part = ""
+            for line in formatted_text.splitlines(True):
+                if len(current_part) + len(line) <= 4096:
+                    current_part += line
+                else:
+                    if current_part:
+                        parts.append(current_part)
+                    current_part = line
+            if current_part:
+                parts.append(current_part)
+            for part in parts:
+                try:
+                    await send_message(
+                        chat_id=message.chat.id,
+                        text=part,
+                        parse_mode=ParseMode.HTML,
+                        disable_web_page_preview=True
+                    )
+                    await asyncio.sleep(0.5)
+                except TelegramBadRequest as send_e:
+                    logger.error(f"Failed to send message part to chat {message.chat.id}: {str(send_e)}")
+                    await Smart_Notify(bot, "ocr", send_e, message)
+            logger.info(f"Successfully sent OCR response (split) to chat {message.chat.id}")
+        else:
+            try:
+                await processing_msg.edit_text(
+                    text=formatted_text,
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=True
+                )
+                logger.info(f"Successfully sent OCR response to chat {message.chat.id}")
+            except Exception as edit_e:
+                logger.error(f"Failed to edit progress message in chat {message.chat.id}: {str(edit_e)}")
+                await Smart_Notify(bot, "ocr", edit_e, message)
                 await delete_messages(
                     chat_id=message.chat.id,
                     message_ids=[processing_msg.message_id]
                 )
-                parts = []
-                current_part = ""
-                for line in formatted_text.splitlines(True):
-                    if len(current_part) + len(line) <= 4096:
-                        current_part += line
-                    else:
-                        if current_part:
-                            parts.append(current_part)
-                        current_part = line
-                if current_part:
-                    parts.append(current_part)
-                for part in parts:
-                    try:
-                        await send_message(
-                            chat_id=message.chat.id,
-                            text=part,
-                            parse_mode=ParseMode.HTML,
-                            disable_web_page_preview=True
-                        )
-                        await asyncio.sleep(0.5)
-                    except TelegramBadRequest as send_e:
-                        logger.error(f"Failed to send message part to chat {message.chat.id}: {str(send_e)}")
-                        await Smart_Notify(bot, "ocr", send_e, message)
-                logger.info(f"Successfully sent OCR response (split) to chat {message.chat.id}")
-            else:
-                try:
-                    await processing_msg.edit_text(
-                        text=formatted_text,
-                        parse_mode=ParseMode.HTML,
-                        disable_web_page_preview=True
-                    )
-                    logger.info(f"Successfully sent OCR response to chat {message.chat.id}")
-                except Exception as edit_e:
-                    logger.error(f"Failed to edit progress message in chat {message.chat.id}: {str(edit_e)}")
-                    await Smart_Notify(bot, "ocr", edit_e, message)
-                    await delete_messages(
-                        chat_id=message.chat.id,
-                        message_ids=[processing_msg.message_id]
-                    )
-                    await send_message(
-                        chat_id=message.chat.id,
-                        text=formatted_text,
-                        parse_mode=ParseMode.HTML,
-                        disable_web_page_preview=True
-                    )
-                    logger.info(f"Successfully sent OCR response to chat {message.chat.id}")
+                await send_message(
+                    chat_id=message.chat.id,
+                    text=formatted_text,
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=True
+                )
+                logger.info(f"Successfully sent OCR response to chat {message.chat.id}")
 
     except Exception as e:
         logger.error(f"OCR Error: {str(e)}")
