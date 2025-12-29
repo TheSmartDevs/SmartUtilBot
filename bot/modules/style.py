@@ -247,12 +247,21 @@ async def process_font_selection(callback: CallbackQuery):
             return
         
         if not original_text:
-            current_text = callback.message.text or ""
-            lines = current_text.split("\n\n", 1)
-            if len(lines) > 1:
-                original_text = lines[1].replace("<code>", "").replace("</code>", "").replace("<b>Click To Copy 👆</b>", "").strip()
+            current_text = callback.message.text or callback.message.caption or ""
+            
+            if "\n\n<b>Click To Copy 👆</b>" in current_text:
+                original_text = current_text.split("\n\n<b>Click To Copy 👆</b>")[0]
             else:
-                original_text = current_text.replace("<code>", "").replace("</code>", "").replace("<b>Click To Copy 👆</b>", "").strip()
+                original_text = current_text
+            
+            original_text = original_text.replace("<code>", "").replace("</code>", "").strip()
+            
+            if original_text:
+                user_original_texts[user_key] = original_text
+
+        if not original_text:
+            await callback.answer("❌ Original text not found!", show_alert=True)
+            return
 
         converted = convert_text(original_text, font_data)
 
@@ -296,6 +305,6 @@ async def process_close(callback: CallbackQuery):
 
 fonts_loaded = load_fonts()
 if fonts_loaded:
-    LOGGER.info("Font Style module loaded successfully")
+    LOGGER.info("✅ Font Style module loaded successfully")
 else:
-    LOGGER.error(" Font Style module loaded with errors - /style command will be unavailable")
+    LOGGER.error("❌ Font Style module loaded with errors - /style command will be unavailable")
