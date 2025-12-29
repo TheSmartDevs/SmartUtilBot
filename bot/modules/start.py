@@ -1,7 +1,5 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import asyncio
+import html
 from bot import dp
 from config import UPDATE_CHANNEL_URL
 from bot.helpers.botutils import send_message, delete_messages
@@ -13,34 +11,36 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 from aiogram.enums import ChatType
 
+
 @dp.message(CommandStart())
 @dp.message(Command(commands=["start"], prefix=BotCommands))
 @SmartDefender
 async def start_command_handler(message: Message, bot: Bot):
     chat_id = message.chat.id
-
     animation_message = await send_message(
         chat_id=chat_id,
         text="<b>Starting The Smart-Util bot...</b>"
     )
     if not animation_message:
         return
-
     await asyncio.sleep(0.2)
     await animation_message.edit_text("<b>Getting session keys wait...</b>")
     await asyncio.sleep(0.2)
     await delete_messages(chat_id=chat_id, message_ids=animation_message.message_id)
-
     buttons = SmartButtons()
     buttons.button(text="⚙️ Main Menu", callback_data="main_menu", position="header")
     buttons.button(text="ℹ️ About Me", callback_data="about_me")
     buttons.button(text="📄 Policy & Terms", callback_data="policy_terms")
     reply_markup = buttons.build_menu(b_cols=2, h_cols=1, f_cols=1)
-
+    
     if message.chat.type == ChatType.PRIVATE:
         full_name = "User"
         if message.from_user:
-            full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
+            first_name = message.from_user.first_name or ''
+            last_name = message.from_user.last_name or ''
+            full_name = f"{first_name} {last_name}".strip()
+            full_name = html.escape(full_name) if full_name else "User"
+        
         response_text = (
             f"<b>Hi {full_name}! Welcome To This Bot</b>\n"
             "<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
@@ -50,10 +50,16 @@ async def start_command_handler(message: Message, bot: Bot):
             "<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
             f"<b>Don't forget to <a href='{UPDATE_CHANNEL_URL}'>join here</a> for updates!</b>"
         )
-    else:  
+    else:
         group_name = message.chat.title or "this group"
+        group_name = html.escape(group_name)
+        
         if message.from_user:
-            full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
+            first_name = message.from_user.first_name or ''
+            last_name = message.from_user.last_name or ''
+            full_name = f"{first_name} {last_name}".strip()
+            full_name = html.escape(full_name) if full_name else "User"
+            
             response_text = (
                 f"<b>Hi {full_name}! Welcome To This Bot</b>\n"
                 "<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
@@ -63,9 +69,9 @@ async def start_command_handler(message: Message, bot: Bot):
                 "<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
                 f"<b>Don't forget to <a href='{UPDATE_CHANNEL_URL}'>join here</a> for updates!</b>"
             )
-        else:  
+        else:
             response_text = (
-                f"<b>Hi{group_name} Welcome To This Bot</b>\n"
+                f"<b>Hi {group_name}! Welcome To This Bot</b>\n"
                 "<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
                 "<b>Smart Util</b> is your ultimate toolkit on Telegram, packed with AI tools, "
                 "educational resources, downloaders, temp mail, crypto utilities, and more. "
@@ -73,7 +79,7 @@ async def start_command_handler(message: Message, bot: Bot):
                 "<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
                 f"<b>Don't forget to <a href='{UPDATE_CHANNEL_URL}'>join here</a> for updates!</b>"
             )
-
+    
     await send_message(
         chat_id=chat_id,
         text=response_text,
