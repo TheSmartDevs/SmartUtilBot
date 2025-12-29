@@ -1,7 +1,6 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
+import html
 from aiogram import Bot
+from aiogram.enums import ParseMode
 from bot import dp
 from config import UPDATE_CHANNEL_URL
 from bot.helpers.botutils import send_message
@@ -14,6 +13,7 @@ from bot.helpers.defend import SmartDefender
 from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.enums import ChatType
+
 
 @dp.message(Command(commands=["help", "cmds"], prefix=BotCommands))
 @new_task
@@ -31,7 +31,10 @@ async def help_command_handler(message: Message, bot: Bot):
     if message.chat.type == ChatType.PRIVATE:
         full_name = "User"
         if message.from_user:
-            full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
+            first_name = message.from_user.first_name or ''
+            last_name = message.from_user.last_name or ''
+            full_name = f"{first_name} {last_name}".strip()
+            full_name = html.escape(full_name) if full_name else "User"
 
         response_text = (
             f"<b>Hi {full_name}! Welcome To This Bot</b>\n"
@@ -42,10 +45,16 @@ async def help_command_handler(message: Message, bot: Bot):
             "<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
             f"<b>Don't forget to <a href='{UPDATE_CHANNEL_URL}'>join here</a> for updates!</b>"
         )
-    else:  
+    else:
         group_name = message.chat.title or "this group"
+        group_name = html.escape(group_name)
+        
         if message.from_user:
-            full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
+            first_name = message.from_user.first_name or ''
+            last_name = message.from_user.last_name or ''
+            full_name = f"{first_name} {last_name}".strip()
+            full_name = html.escape(full_name) if full_name else "User"
+            
             response_text = (
                 f"<b>Hi {full_name}! Welcome To This Bot</b>\n"
                 "<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
@@ -55,9 +64,9 @@ async def help_command_handler(message: Message, bot: Bot):
                 "<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
                 f"<b>Don't forget to <a href='{UPDATE_CHANNEL_URL}'>join here</a> for updates!</b>"
             )
-        else:  
+        else:
             response_text = (
-                f"<b>Hi {group_name} Welcome To This Bot</b>\n"
+                f"<b>Hi {group_name}! Welcome To This Bot</b>\n"
                 "<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
                 "<b>Smart Util</b> is your ultimate toolkit on Telegram, packed with AI tools, "
                 "educational resources, downloaders, temp mail, crypto utilities, and more. "
