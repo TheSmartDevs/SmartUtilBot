@@ -13,6 +13,7 @@ from bot.helpers.donateutils import DONATION_OPTIONS_TEXT, get_donation_buttons,
 from bot.helpers.logger import LOGGER
 from bot.core.mongo import SmartUsers
 from config import UPDATE_CHANNEL_URL
+import html
 
 async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
     call = callback_query
@@ -85,12 +86,13 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
             user_id = user['user_id']
             try:
                 telegram_user = await bot.get_chat(user_id)
-                full_name = f"{telegram_user.first_name} {telegram_user.last_name}" if telegram_user.last_name else telegram_user.first_name
+                full_name = f"{telegram_user.first_name} {telegram_user.last_name or ''}".strip()
+                full_name_escaped = html.escape(full_name)
             except Exception as e:
                 LOGGER.error(f"Failed to fetch user {user_id}: {e}")
-                full_name = f"User_{user_id}"
+                full_name_escaped = f"User_{user_id}"
             rank_emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else "🔸"
-            top_users_text += f"<b>{rank_emoji} {i}.</b> <a href=\"tg://user?id={user_id}\">{full_name}</a>\n<b> - User Id :</b> <code>{user_id}</code>\n\n"
+            top_users_text += f"<b>{rank_emoji} {i}.</b> <a href=\"tg://user?id={user_id}\">{full_name_escaped}</a>\n<b> - User Id :</b> <code>{user_id}</code>\n\n"
 
         top_users_buttons = SmartButtons()
         if page == 1 and total_pages > 1:
@@ -215,9 +217,10 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
         await call.message.delete()
 
     elif call.data == "start_message":
-        full_name = f"{call.from_user.first_name} {call.from_user.last_name}" if call.from_user.last_name else call.from_user.first_name
+        full_name_raw = f"{call.from_user.first_name} {call.from_user.last_name or ''}".strip()
+        full_name_escaped = html.escape(full_name_raw)
         start_message = (
-            f"<b>Hi {full_name}! Welcome To This Bot</b>\n"
+            f"<b>Hi {full_name_escaped}! Welcome To This Bot</b>\n"
             f"<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
             f"<b>Smart Util</b> is your ultimate toolkit on Telegram, packed with AI tools, "
             f"educational resources, downloaders, temp mail, crypto utilities, and more. "
@@ -240,9 +243,10 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
     elif call.data == "policy_terms":
         policy_terms_text = (
             f"<b>📜 Policy & Terms Menu</b>\n\n"
-            f"At <b>Smart Tool ⚙️</b>, we prioritize your privacy and security. To ensure a seamless and safe experience, we encourage you to review our <b>Privacy Policy</b> and <b>Terms & Conditions</b>.\n\n"
+            f"At <b>Smart Util ⚙️</b>, we prioritize your privacy and security. To ensure a seamless and safe experience, we encourage you to review our <b>Privacy Policy</b> and <b>Terms & Conditions</b>.\n\n"
             f"🔹 <b>Privacy Policy</b>: Learn how we collect, use, and protect your personal data.\n"
             f"🔹 <b>Terms & Conditions</b>: Understand the rules and guidelines for using our services.\n\n"
+            f"✅ Staying informed helps you make the most of <b>Smart Util ⚙️</b> while ensuring compliance with our policies.\n\n"
             f"<b>💡 Choose an option below to proceed:</b>"
         )
         policy_terms_button = SmartButtons()
@@ -254,20 +258,20 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
 
     elif call.data == "privacy_policy":
         privacy_policy_text = (
-            f"<b>📜 Privacy Policy for Smart Util ⚙️</b>\n\n"
-            f"Welcome to <b>Smart Util ⚙️</b> Bot. By using our services, you agree to this privacy policy.\n\n"
-            f"1. <b>Personal Information</b>:\n"
-            f" - Personal Information: User ID and username for personalization.\n"
-            f" - <b>Usage Data</b>: Information on how you use the app to improve our services.\n\n"
-            f"2. Usage of Information:\n"
-            f" - <b>Service Enhancement</b>: To provide and improve <b>Smart Util ⚙️</b>\n"
-            f" - <b>Communication</b>: Updates and new features.\n"
-            f" - <b>Security</b>: To prevent unauthorized access.\n"
-            f" - <b>Advertisements</b>: Display of promotions.\n\n"
-            f"3. Data Security:\n"
-            f" - These tools do not store any data, ensuring your privacy.\n"
-            f" - We use strong security measures, although no system is 100% secure.\n\n"
-            f"Thank you for using <b>Smart Util ⚙️</b>. We prioritize your privacy and security."
+            f"<b>📜 Privacy Policy for Smart Util</b>\n\n"
+            f"Welcome to <b>Smart Util</b> Bot. By using our services, you agree to this privacy policy.\n\n"
+            f"<b>1. Information We Collect:</b>\n"
+            f"   - <b>Personal Information:</b> User ID and username for personalization.\n"
+            f"   - <b>Usage Data:</b> Information on how you use the app to improve our services.\n\n"
+            f"<b>2. Usage of Information:</b>\n"
+            f"   - <b>Service Enhancement:</b> To provide and improve <b>Smart Util</b>.\n"
+            f"   - <b>Communication:</b> Updates and new features.\n"
+            f"   - <b>Security:</b> To prevent unauthorized access.\n"
+            f"   - <b>Advertisements:</b> Display of promotions.\n\n"
+            f"<b>3. Data Security:</b>\n"
+            f"   - These tools do not store any data, ensuring your privacy.\n"
+            f"   - We use strong security measures, although no system is 100% secure.\n\n"
+            f"Thank you for using <b>Smart Util</b>. We prioritize your privacy and security."
         )
         back_button = SmartButtons()
         back_button.button(text="⬅️ Back", callback_data="policy_terms")
@@ -276,29 +280,30 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
 
     elif call.data == "terms_conditions":
         terms_conditions_text = (
-            f"<b>📜 Terms & Conditions for Smart Util ⚙️</b>\n\n"
-            f"Welcome to <b>Smart Util ⚙️</b>. By using our services, you accept these <b>Terms & Conditions</b>.\n\n"
+            f"<b>📜 Terms & Conditions for Smart Util</b>\n\n"
+            f"Welcome to <b>Smart Util</b>. By using our services, you accept these <b>Terms & Conditions</b>.\n\n"
             f"<b>1. Usage Guidelines</b>\n"
-            f" - Eligibility: Must be 13 years of age or older.\n\n"
+            f"   - <b>Eligibility:</b> Must be 13 years of age or older.\n"
+            f"   - This bot fully complies with Telegram’s <a href=\"https://telegram.org/tos/bot-developers\">Terms Of Service</a>\n\n"
             f"<b>2. Prohibited</b>\n"
-            f" - Illegal and unauthorized uses are strictly forbidden.\n"
-            f" - Spamming and abusing are not allowed in this Bot\n\n"
+            f"   - Illegal and unauthorized usage is strictly forbidden.\n"
+            f"   - Spamming, abuse, or any kind of misuse is not tolerated.\n\n"
             f"<b>3. Tools and Usage</b>\n"
-            f" - For testing/development purposes only, not for illegal use.\n"
-            f" - We <b>do not support</b> misuse for fraud or policy violations.\n"
-            f" - Automated requests may lead to service limitations or suspension.\n"
-            f" - We are not responsible for any account-related issues.\n\n"
+            f"   - For testing/development purposes only — not intended for unlawful activities.\n"
+            f"   - We do not support misuse, fraud, or any policy-violating behavior.\n"
+            f"   - Automated actions may result in rate limits or suspension.\n"
+            f"   - We are not liable for account bans or misuse of tools.\n\n"
             f"<b>4. User Responsibility</b>\n"
-            f" - You are responsible for all activities performed using the bot.\n"
-            f" - Ensure that your activities comply with platform policies.\n\n"
+            f"   - Users are responsible for how they use the bot.\n"
+            f"   - Activities must comply with Telegram and legal policies.\n\n"
             f"<b>5. Disclaimer of Warranties</b>\n"
-            f" - We do not guarantee uninterrupted service, accuracy, or reliability.\n"
-            f" - We are not responsible for any consequences arising from your use of the bot.\n\n"
+            f"   - No guarantee of uptime, accuracy, or data reliability.\n"
+            f"   - We are not responsible for any misuse or its consequences.\n\n"
             f"<b>6. Termination</b>\n"
-            f" - Access may be terminated for any violations without prior notice.\n\n"
+            f"   - Violations may lead to user ban or service suspension without prior notice.\n\n"
             f"<b>7. Contact Information</b>\n"
-            f" - Contact My Dev for any inquiries or concerns. <a href=\"tg://user?id=7303810912\">Abir Arafat Chawdhury👨‍💻</a> \n\n"
-            f"Thank you for using <b>Smart Util ⚙️</b>. We prioritize your safety, security, and best user experience. 🚀"
+            f"   - For concerns, contact  <a href=\"https://t.me/ISmartCoder\">ᴀʙɪʀ ᴀʀᴀꜰᴀᴛ ᴄʜᴀᴡᴅʜᴜʀʏ 🇧🇩</a>\n\n"
+            f"Thank you for using <b>Smart Util</b>. Your privacy, safety, and experience matter most. 🚀"
         )
         back_button = SmartButtons()
         back_button.button(text="⬅️ Back", callback_data="policy_terms")
