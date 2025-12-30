@@ -17,11 +17,24 @@ from bot.helpers.notify import Smart_Notify
 from bot.helpers.buttons import SmartButtons
 from bot.helpers.defend import SmartDefender
 from config import LOG_CHANNEL_ID
-import os
+import aiohttp
 
 logger = LOGGER
 
-BASE_URL = os.getenv("BASE_URL", "http://161.97.132.210:5000")
+FILE_API_URL = "http://161.97.132.210:5000"
+
+async def check_api_health():
+    try:
+        timeout = aiohttp.ClientTimeout(total=5)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            base_url = FILE_API_URL.rstrip('/')
+            async with session.get(f"{base_url}/") as response:
+                if response.status == 200:
+                    return True
+                else:
+                    return False
+    except:
+        return False
 
 async def get_telegram_file_id(message: Message):
     if message.document:
@@ -98,6 +111,15 @@ async def format_file_size(file_size: int):
         unit = "GB"
     return f"{size:.2f} {unit}"
 
+async def find_existing_message(code: str, limit: int = 100):
+    try:
+        async for message in SmartPyro.get_chat_history(LOG_CHANNEL_ID, limit=limit):
+            if message.caption == code:
+                return message.id
+    except Exception as e:
+        logger.error(f"Error searching for existing message: {e}")
+    return None
+
 async def handle_file_download(message: Message, bot: Bot):
     if not message.reply_to_message:
         await send_message(
@@ -120,6 +142,16 @@ async def handle_file_download(message: Message, bot: Bot):
         parse_mode=ParseMode.HTML
     )
     try:
+        api_is_running = await check_api_health()
+        if not api_is_running:
+            await bot.edit_message_text(
+                chat_id=processing_msg.chat.id,
+                message_id=processing_msg.message_id,
+                text="<b>Sorry File To Link Api Is Offline ❌</b>",
+                parse_mode=ParseMode.HTML
+            )
+            logger.error("API is offline, stopping process")
+            return
         bot_member = await SmartPyro.get_chat_member(LOG_CHANNEL_ID, "me")
         if bot_member.status not in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
             await bot.edit_message_text(
@@ -142,27 +174,35 @@ async def handle_file_download(message: Message, bot: Bot):
             return
         file_name, file_size, mime_type = await get_file_properties(reply_message)
         code = f"{telegram_file_id}-{bot_user_id}"
-        message_id = None
-        if message.chat.id == LOG_CHANNEL_ID:
-            sent = await SmartPyro.copy_message(
-                chat_id=LOG_CHANNEL_ID,
-                from_chat_id=LOG_CHANNEL_ID,
-                message_id=reply_message.message_id,
-                caption=code
-            )
-            message_id = sent.id
+        
+        existing_message_id = await find_existing_message(code)
+        
+        if existing_message_id:
+            message_id = existing_message_id
+            logger.info(f"Found existing message for file_id: {telegram_file_id}, message_id: {message_id}")
         else:
-            sent = await reply_message.forward(LOG_CHANNEL_ID)
-            temp_id = sent.message_id
-            sent = await SmartPyro.copy_message(
-                chat_id=LOG_CHANNEL_ID,
-                from_chat_id=LOG_CHANNEL_ID,
-                message_id=temp_id,
-                caption=code
-            )
-            message_id = sent.id
+            if message.chat.id == LOG_CHANNEL_ID:
+                sent = await SmartPyro.copy_message(
+                    chat_id=LOG_CHANNEL_ID,
+                    from_chat_id=LOG_CHANNEL_ID,
+                    message_id=reply_message.message_id,
+                    caption=code
+                )
+                message_id = sent.id
+            else:
+                sent = await reply_message.forward(LOG_CHANNEL_ID)
+                temp_id = sent.message_id
+                sent = await SmartPyro.copy_message(
+                    chat_id=LOG_CHANNEL_ID,
+                    from_chat_id=LOG_CHANNEL_ID,
+                    message_id=temp_id,
+                    caption=code
+                )
+                message_id = sent.id
+            logger.info(f"Created new message for file_id: {telegram_file_id}, message_id: {message_id}")
+        
         quoted_code = urllib.parse.quote(code)
-        base_url = BASE_URL.rstrip('/')
+        base_url = FILE_API_URL.rstrip('/')
         download_link = f"{base_url}/dl/{message_id}?code={quoted_code}"
         is_video = mime_type.startswith('video') or reply_message.video or reply_message.video_note
         stream_link = f"{base_url}/dl/{message_id}?code={quoted_code}=stream" if is_video else None
