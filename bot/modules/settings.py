@@ -11,6 +11,8 @@ from bot.helpers.buttons import SmartButtons
 from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.guard import admin_only
+from bot.core.database import SmartGuards
+from config import OWNER_ID
 
 user_session = {}
 settings_lock = asyncio.Lock()
@@ -114,8 +116,6 @@ async def show_settings(message: Message, bot: Bot):
 
 @dp.callback_query(lambda c: c.data.startswith("settings_page_"))
 async def paginate_menu(query: CallbackQuery, bot: Bot):
-    from bot.core.database import SmartGuards
-    from config import OWNER_ID
     user_id = query.from_user.id
     auth_admins_data = await SmartGuards.find({}, {"user_id": 1, "_id": 0}).to_list(None)
     AUTH_ADMIN_IDS = [admin["user_id"] for admin in auth_admins_data]
@@ -134,8 +134,6 @@ async def paginate_menu(query: CallbackQuery, bot: Bot):
 
 @dp.callback_query(lambda c: c.data.startswith("settings_edit_"))
 async def edit_var(query: CallbackQuery, bot: Bot):
-    from bot.core.database import SmartGuards
-    from config import OWNER_ID
     user_id = query.from_user.id
     auth_admins_data = await SmartGuards.find({}, {"user_id": 1, "_id": 0}).to_list(None)
     AUTH_ADMIN_IDS = [admin["user_id"] for admin in auth_admins_data]
@@ -156,7 +154,7 @@ async def edit_var(query: CallbackQuery, bot: Bot):
     reply_markup = buttons.build_menu(b_cols=1)
     try:
         await query.message.edit_text(
-            text=f"<b>Editing <code>{var_name}</code>. Please send the new value below with a prefix (e.g., .value).</b>",
+            text=f"<b>Editing <code>{var_name}</code>. Please send the new value below.</b>",
             parse_mode=SmartParseMode.HTML,
             reply_markup=reply_markup
         )
@@ -168,8 +166,6 @@ async def edit_var(query: CallbackQuery, bot: Bot):
 
 @dp.callback_query(lambda c: c.data == "settings_cancel_edit")
 async def cancel_edit(query: CallbackQuery, bot: Bot):
-    from bot.core.database import SmartGuards
-    from config import OWNER_ID
     user_id = query.from_user.id
     auth_admins_data = await SmartGuards.find({}, {"user_id": 1, "_id": 0}).to_list(None)
     AUTH_ADMIN_IDS = [admin["user_id"] for admin in auth_admins_data]
@@ -191,8 +187,6 @@ async def cancel_edit(query: CallbackQuery, bot: Bot):
 
 @dp.callback_query(lambda c: c.data == "settings_closesettings")
 async def close_menu(query: CallbackQuery, bot: Bot):
-    from bot.core.database import SmartGuards
-    from config import OWNER_ID
     user_id = query.from_user.id
     auth_admins_data = await SmartGuards.find({}, {"user_id": 1, "_id": 0}).to_list(None)
     AUTH_ADMIN_IDS = [admin["user_id"] for admin in auth_admins_data]
@@ -211,7 +205,7 @@ async def close_menu(query: CallbackQuery, bot: Bot):
         LOGGER.error(f"Failed to close settings menu for user_id {user_id}: {e}")
         await query.answer("❌ Failed to close!", show_alert=True)
 
-@dp.message(lambda message: message.text is not None and any(message.text.startswith(prefix) for prefix in BotCommands) and message.from_user.id in user_session and user_session.get(message.from_user.id, {}).get("chat_id") == message.chat.id)
+@dp.message(lambda message: message.from_user.id in user_session and user_session.get(message.from_user.id, {}).get("chat_id") == message.chat.id)
 @validate_message
 @admin_only
 async def update_value(message: Message, bot: Bot):
@@ -221,21 +215,17 @@ async def update_value(message: Message, bot: Bot):
         LOGGER.debug(f"No valid text in message for user_id {message.from_user.id}")
         await send_message(
             chat_id=message.chat.id,
-            text="<b>Please provide a text value to update with a prefix (e.g., .value) ❌</b>",
+            text="<b>Please provide a text value to update ❌</b>",
             parse_mode=SmartParseMode.HTML
         )
         return
     val = message_text.strip()
-    for prefix in BotCommands:
-        if val.startswith(prefix):
-            val = val[len(prefix):].strip()
-            break
-    LOGGER.debug(f"Processed input for user_id {message.from_user.id}: raw={message_text}, stripped={val}")
+    LOGGER.debug(f"Processed input for user_id {message.from_user.id}: value={val}")
     if not val:
-        LOGGER.debug(f"Empty value after stripping prefix for user_id {message.from_user.id}")
+        LOGGER.debug(f"Empty value for user_id {message.from_user.id}")
         await send_message(
             chat_id=message.chat.id,
-            text="<b>Please provide a non-empty value after the prefix (e.g., .value) ❌</b>",
+            text="<b>Please provide a non-empty value ❌</b>",
             parse_mode=SmartParseMode.HTML
         )
         return
