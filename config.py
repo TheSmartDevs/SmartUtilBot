@@ -47,6 +47,7 @@ IPINFO_API_TOKEN = get_env_or_default("IPINFO_API_TOKEN", "Your_IPINFO_API_TOKEN
 raw_prefixes = get_env_or_default("COMMAND_PREFIX", "!|.|#|,|/")
 COMMAND_PREFIX = [prefix.strip() for prefix in raw_prefixes.split("|") if prefix.strip()]
 UPDATE_CHANNEL_URL = get_env_or_default("UPDATE_CHANNEL_URL", "https://t.me/TheSmartDev")
+FILE_API_URL = get_env_or_default("FILE_API_URL", "https://0a740c0f-d312-4.com")
 LOG_CHANNEL_ID = get_env_or_default("LOG_CHANNEL_ID", "-1002735511721")
 IMGAI_SIZE_LIMIT = get_env_or_default("IMGAI_SIZE_LIMIT", 5242880, int)
 MAX_TXT_SIZE = get_env_or_default("MAX_TXT_SIZE", 15728640, int)
