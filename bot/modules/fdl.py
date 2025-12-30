@@ -6,7 +6,6 @@ from aiogram import Bot
 from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.enums import ParseMode
-from pyrogram.enums import ParseMode as SmartParseMode
 from pyrogram.types import Message as SmartMessage
 from pyrogram.enums import ChatMemberStatus
 from bot import dp, SmartPyro
@@ -123,8 +122,10 @@ async def handle_file_download(message: Message, bot: Bot):
     try:
         bot_member = await SmartPyro.get_chat_member(LOG_CHANNEL_ID, "me")
         if bot_member.status not in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
-            await processing_msg.edit_text(
-                "<b>Error: Bot must be an admin in the log channel</b>",
+            await bot.edit_message_text(
+                chat_id=processing_msg.chat.id,
+                message_id=processing_msg.message_id,
+                text="<b>Error: Bot must be an admin in the log channel</b>",
                 parse_mode=ParseMode.HTML
             )
             return
@@ -132,8 +133,10 @@ async def handle_file_download(message: Message, bot: Bot):
         bot_user_id = bot_me.id
         telegram_file_id = await get_telegram_file_id(reply_message)
         if not telegram_file_id:
-            await processing_msg.edit_text(
-                "<b>Error: Could not get file ID</b>",
+            await bot.edit_message_text(
+                chat_id=processing_msg.chat.id,
+                message_id=processing_msg.message_id,
+                text="<b>Error: Could not get file ID</b>",
                 parse_mode=ParseMode.HTML
             )
             return
@@ -145,8 +148,7 @@ async def handle_file_download(message: Message, bot: Bot):
                 chat_id=LOG_CHANNEL_ID,
                 from_chat_id=LOG_CHANNEL_ID,
                 message_id=reply_message.message_id,
-                caption=code,
-                parse_mode=SmartParseMode.HTML
+                caption=code
             )
             message_id = sent.id
         else:
@@ -156,8 +158,7 @@ async def handle_file_download(message: Message, bot: Bot):
                 chat_id=LOG_CHANNEL_ID,
                 from_chat_id=LOG_CHANNEL_ID,
                 message_id=temp_id,
-                caption=code,
-                parse_mode=SmartParseMode.HTML
+                caption=code
             )
             message_id = sent.id
         quoted_code = urllib.parse.quote(code)
@@ -166,20 +167,32 @@ async def handle_file_download(message: Message, bot: Bot):
         is_video = mime_type.startswith('video') or reply_message.video or reply_message.video_note
         stream_link = f"{base_url}/dl/{message_id}?code={quoted_code}=stream" if is_video else None
         smart_buttons = SmartButtons()
-        smart_buttons.button("🚀 Download", url=download_link)
-        if stream_link:
-            smart_buttons.button("🖥️ Stream", url=stream_link)
-        keyboard = smart_buttons.build_menu(b_cols=2)
-        response = (
-            f"<b>✨ Your Links are Ready! ✨</b>\n\n"
-            f"<code>{file_name}</code>\n\n"
-            f"<b>📂 File Size:</b> <code>{await format_file_size(file_size)}</code>\n\n"
-            f"<b>🚀 Download Link:</b> <code>{download_link}</code>\n\n"
-        )
-        if stream_link:
-            response += f"<b>🖥️ Stream Link:</b> <code>{stream_link}</code>\n\n"
-        response += "<b>⌛️ Note: </b>\n<blockquote>Links remain active while the bot is running and the file is accessible.</blockquote>"
-        await processing_msg.edit_text(
+        if is_video:
+            smart_buttons.button("📥 Download", url=download_link)
+            smart_buttons.button("▶️ Stream", url=stream_link)
+            keyboard = smart_buttons.build_menu(b_cols=1)
+        else:
+            smart_buttons.button("📥 Download", url=download_link)
+            keyboard = smart_buttons.build_menu(b_cols=1)
+        if is_video:
+            response = (
+                f"<b>Video Name:</b> {file_name}\n"
+                f"<b>Size:</b> {await format_file_size(file_size)}\n\n"
+                f"<b>Download:</b> <code>{download_link}</code>\n\n"
+                f"<b>Stream:</b> <code>{stream_link}</code>\n\n"
+                f"<b>• Open in any browser or player.</b>\n"
+                f"<b>• Stream works on PC & Android browsers.</b>"
+            )
+        else:
+            response = (
+                f"<b>File Name:</b> {file_name}\n"
+                f"<b>File Size:</b> {await format_file_size(file_size)}\n\n"
+                f"<b>File Link:</b> <code>{download_link}</code>\n\n"
+                f"<b>Use the link to download the file directly.</b>"
+            )
+        await bot.edit_message_text(
+            chat_id=processing_msg.chat.id,
+            message_id=processing_msg.message_id,
             text=response,
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard,
@@ -189,8 +202,10 @@ async def handle_file_download(message: Message, bot: Bot):
     except Exception as e:
         logger.error(f"Error generating links, error: {str(e)}")
         await Smart_Notify(bot, f"{BotCommands}fdl", e, processing_msg)
-        await processing_msg.edit_text(
-            f"<b>Error: Failed to generate link - {str(e)}</b>",
+        await bot.edit_message_text(
+            chat_id=processing_msg.chat.id,
+            message_id=processing_msg.message_id,
+            text=f"<b>Error: Failed to generate link - {str(e)}</b>",
             parse_mode=ParseMode.HTML
         )
 
