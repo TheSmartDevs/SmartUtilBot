@@ -5,6 +5,7 @@ import zipfile
 import tempfile
 import aiohttp
 import aiofiles
+import html
 from urllib.parse import urljoin, urlparse, unquote
 from bs4 import BeautifulSoup
 from aiogram import Bot
@@ -74,7 +75,7 @@ class UrlDownloader:
                 'Sec-Fetch-Mode': 'navigate',
                 'Sec-Fetch-Site': 'none'
             }
-            
+
             async with session.get(url, timeout=20, headers=headers, allow_redirects=True) as response:
                 if response.status != 200:
                     return False, f"HTTP error {response.status}: {response.reason}", []
@@ -168,7 +169,7 @@ class UrlDownloader:
             rel = link.get('rel', [])
             if isinstance(rel, str):
                 rel = [rel]
-            
+
             if 'stylesheet' in rel or link.get('type') == 'text/css':
                 href = link.get('href')
                 if href:
@@ -204,11 +205,11 @@ class UrlDownloader:
             if img.get('src'):
                 src_url = urljoin(base_url, img.get('src').strip())
                 urls.add(src_url)
-            
+
             if img.get('data-src'):
                 lazy_url = urljoin(base_url, img.get('data-src').strip())
                 urls.add(lazy_url)
-            
+
             if img.get('srcset'):
                 srcset_urls = self._parse_srcset(img.get('srcset'), base_url)
                 urls.update(srcset_urls)
@@ -232,7 +233,7 @@ class UrlDownloader:
             rel = link.get('rel', [])
             if isinstance(rel, str):
                 rel = [rel]
-            
+
             if any(r in rel for r in ['icon', 'shortcut icon', 'apple-touch-icon', 'manifest', 'alternate', 'canonical', 'preload', 'prefetch', 'dns-prefetch']):
                 href = link.get('href')
                 if href and not href.startswith(('http://', 'https://')) or href.startswith('/'):
@@ -279,7 +280,7 @@ class UrlDownloader:
         urls = set()
         if not srcset:
             return urls
-        
+
         entries = srcset.split(',')
         for entry in entries:
             entry = entry.strip()
@@ -294,7 +295,7 @@ class UrlDownloader:
 
     def _extract_css_urls(self, css_content, base_url):
         urls = set()
-        
+
         url_pattern = r'url\s*\(\s*["\']?([^"\'()]+)["\']?\s*\)'
         css_urls = re.findall(url_pattern, css_content, re.IGNORECASE)
         for css_url in css_urls:
@@ -312,7 +313,7 @@ class UrlDownloader:
 
     def _extract_inline_urls(self, html_content, base_url):
         urls = set()
-        
+
         style_blocks = re.findall(r'<style[^>]*>(.*?)</style>', html_content, re.DOTALL | re.IGNORECASE)
         for style_block in style_blocks:
             style_urls = self._extract_css_urls(style_block, base_url)
@@ -332,7 +333,7 @@ class UrlDownloader:
     async def _download_all_resources(self, resource_urls, pagefolder, session):
         tasks = []
         file_paths = []
-        
+
         for resource_url in resource_urls:
             if resource_url not in self.downloaded_files and resource_url not in self.failed_urls:
                 self.downloaded_files.add(resource_url)
@@ -357,7 +358,7 @@ class UrlDownloader:
         try:
             parsed_url = urlparse(resource_url)
             path = unquote(parsed_url.path)
-            
+
             if not path or path == '/':
                 query = parsed_url.query
                 fragment = parsed_url.fragment
@@ -370,7 +371,7 @@ class UrlDownloader:
 
             path_parts = path.strip('/').split('/') if path.strip('/') else ['index']
             filename = path_parts[-1] if path_parts[-1] else 'index'
-            
+
             if '.' in filename and len(filename.split('.')[-1]) <= 10:
                 file_ext = filename.split('.')[-1].lower()
             else:
@@ -382,7 +383,7 @@ class UrlDownloader:
                 file_ext = file_ext or 'html'
 
             folder_name = self.extensions.get(file_ext, 'assets')
-            
+
             if len(path_parts) > 1:
                 subfolder_path = '/'.join(path_parts[:-1])
                 target_folder = os.path.join(pagefolder, folder_name, subfolder_path)
@@ -390,7 +391,7 @@ class UrlDownloader:
                 target_folder = os.path.join(pagefolder, folder_name)
 
             os.makedirs(target_folder, exist_ok=True)
-            
+
             counter = 1
             base_filename = filename
             while True:
@@ -408,7 +409,7 @@ class UrlDownloader:
 
     def _guess_extension_from_url(self, url):
         url_lower = url.lower()
-        
+
         if any(keyword in url_lower for keyword in ['css', 'style']):
             return 'css'
         elif any(keyword in url_lower for keyword in ['js', 'javascript', 'script']):
@@ -425,7 +426,7 @@ class UrlDownloader:
             return 'json'
         elif 'xml' in url_lower:
             return 'xml'
-        
+
         return None
 
     async def _download_single_resource(self, resource_url, file_path, session):
@@ -441,7 +442,7 @@ class UrlDownloader:
                     'Sec-Fetch-Mode': 'cors',
                     'Sec-Fetch-Site': 'cross-site'
                 }
-                
+
                 async with session.get(resource_url, timeout=15, headers=headers, allow_redirects=True) as response:
                     if response.status not in [200, 206]:
                         self.failed_urls.add(resource_url)
@@ -453,7 +454,7 @@ class UrlDownloader:
                         return False
 
                     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                    
+
                     if file_path.endswith('.css'):
                         try:
                             decoded_content = content.decode('utf-8', errors='ignore')
@@ -461,12 +462,12 @@ class UrlDownloader:
                             content = processed_content.encode('utf-8')
                         except:
                             pass
-                    
+
                     async with aiofiles.open(file_path, 'wb') as file:
                         await file.write(content)
-                    
+
                     return True
-                        
+
             except Exception as e:
                 self.failed_urls.add(resource_url)
                 return False
@@ -478,7 +479,7 @@ class UrlDownloader:
                 full_url = urljoin(base_url, url)
                 return f'url("{full_url}")'
             return match.group(0)
-        
+
         css_content = re.sub(r'url\s*\(\s*["\']?([^"\'()]+)["\']?\s*\)', replace_url, css_content)
         return css_content
 
@@ -511,13 +512,13 @@ class UrlDownloader:
         try:
             parsed_url = urlparse(resource_url)
             path = unquote(parsed_url.path)
-            
+
             if not path or path == '/':
                 return None
-                
+
             path_parts = path.strip('/').split('/') if path.strip('/') else ['index']
             filename = path_parts[-1] if path_parts[-1] else 'index'
-            
+
             if '.' in filename and len(filename.split('.')[-1]) <= 10:
                 file_ext = filename.split('.')[-1].lower()
             else:
@@ -525,13 +526,13 @@ class UrlDownloader:
                 filename = f"{filename}.{file_ext}"
 
             folder_name = self.extensions.get(file_ext, 'assets')
-            
+
             if len(path_parts) > 1:
                 subfolder = '/'.join(path_parts[:-1])
                 local_path = f"{folder_name}/{subfolder}/{filename}"
             else:
                 local_path = f"{folder_name}/{filename}"
-                
+
             return local_path
         except:
             return None
@@ -547,7 +548,7 @@ def create_zip(folder_path):
         with zipfile.ZipFile(temp_file.name, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as zip_file:
             file_count = 0
             total_size = 0
-            
+
             for root, _, files in os.walk(folder_path):
                 for file in files:
                     try:
@@ -556,7 +557,7 @@ def create_zip(folder_path):
                             file_size = os.path.getsize(file_path)
                             if total_size + file_size > 19 * 1024 * 1024:
                                 continue
-                            
+
                             arc_name = os.path.relpath(file_path, folder_path)
                             zip_file.write(file_path, arc_name)
                             file_count += 1
@@ -609,7 +610,7 @@ async def websource(message: Message, bot: Bot):
     try:
         connector = aiohttp.TCPConnector(limit=150, limit_per_host=50, ttl_dns_cache=300, use_dns_cache=True)
         timeout = aiohttp.ClientTimeout(total=120, connect=20, sock_read=15)
-        
+
         async with aiohttp.ClientSession(
             connector=connector,
             timeout=timeout,
@@ -623,7 +624,7 @@ async def websource(message: Message, bot: Bot):
                 await SmartAIO.edit_message_text(
                     chat_id=message.chat.id,
                     message_id=loading_message.message_id,
-                    text=f"<b>❌ Failed to download source code.</b>\n<code>{error}</code>",
+                    text=f"<b>❌ Failed to download source code.</b>\n<code>{html.escape(error)}</code>",
                     parse_mode=ParseMode.HTML
                 )
                 await Smart_Notify(bot, "/ws", Exception(error), message)
@@ -656,14 +657,16 @@ async def websource(message: Message, bot: Bot):
             time_taken = end_time - start_time
 
             user = message.from_user
-            user_mention = f"<a href=\"tg://user?id={user.id}\">{user.first_name} {user.last_name or ''}</a>".strip()
+            first_name = html.escape(user.first_name)
+            last_name = html.escape(user.last_name) if user.last_name else ''
+            user_mention = f"<a href=\"tg://user?id={user.id}\">{first_name} {last_name}</a>".strip()
             domain = urlparse(url).netloc
             domain_clean = domain.replace('www.', '')
-            
+
             caption = (
                 "<b>Website Source Download Successful ➺ ✅</b>\n"
                 "<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n"
-                f"<b>⊗ Website:</b> <code>{domain}</code>\n"
+                f"<b>⊗ Website:</b> <code>{html.escape(domain)}</code>\n"
                 f"<b>⊗ Total Files:</b> <code>{file_count}</code>\n"
                 f"<b>⊗ Archive Size:</b> <code>{zip_size_mb:.2f} MB</code>\n"
                 f"<b>⊗ File Contains:</b> <i>HTML, CSS, JS, Images, Fonts & Assets</i>\n"
@@ -676,7 +679,7 @@ async def websource(message: Message, bot: Bot):
 
             await SmartAIO.send_document(
                 chat_id=message.chat.id,
-                document=FSInputFile(zip_file_path, filename=f"SmartSourceCode({domain_clean}).zip"),
+                document=FSInputFile(zip_file_path, filename=f"SmartSourceCode({html.escape(domain_clean)}).zip"),
                 caption=caption,
                 parse_mode=ParseMode.HTML
             )
