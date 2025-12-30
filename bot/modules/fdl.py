@@ -1,3 +1,5 @@
+#Copyright @ISmartCoder
+#Updates Channel https://t.me/abirxdhackz 
 import asyncio
 import urllib.parse
 from datetime import datetime
@@ -16,12 +18,10 @@ from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.buttons import SmartButtons
 from bot.helpers.defend import SmartDefender
-from config import LOG_CHANNEL_ID
+from config import LOG_CHANNEL_ID, FILE_API_URL
 import aiohttp
 
 logger = LOGGER
-
-FILE_API_URL = "http://161.97.132.210:5000"
 
 async def check_api_health():
     try:
