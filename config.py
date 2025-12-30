@@ -42,7 +42,7 @@ GROQ_API_KEY = get_env_or_default("GROQ_API_KEY", "Your_GROQ_API_KEY_Here")
 WEB_SS_KEY = get_env_or_default("WEB_SS_KEY", "Your_WEB_SS_KEY_Here")
 IMAGE_UPLOAD_KEY = get_env_or_default("IMAGE_UPLOAD_KEY", "Your_IMAGE_UPLOAD_KEY_Here")
 GROQ_API_URL = get_env_or_default("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
-TEXT_MODEL = get_env_or_default("TEXT_MODEL", "deepseek-r1-distill-llama-70b")
+TEXT_MODEL = get_env_or_default("TEXT_MODEL", "qwen/qwen3-32b)
 IPINFO_API_TOKEN = get_env_or_default("IPINFO_API_TOKEN", "Your_IPINFO_API_TOKEN_Here")
 raw_prefixes = get_env_or_default("COMMAND_PREFIX", "!|.|#|,|/")
 COMMAND_PREFIX = [prefix.strip() for prefix in raw_prefixes.split("|") if prefix.strip()]
