@@ -124,7 +124,7 @@ async def handle_file_download(message: Message, bot: Bot):
     if not message.reply_to_message:
         await send_message(
             chat_id=message.chat.id,
-            text="<b>Please Reply To File For Link</b>",
+            text="<b>Please Reply To File For Link ❌</b>",
             parse_mode=ParseMode.HTML
         )
         return
@@ -132,7 +132,7 @@ async def handle_file_download(message: Message, bot: Bot):
     if not (reply_message.document or reply_message.video or reply_message.photo or reply_message.audio or reply_message.video_note):
         await send_message(
             chat_id=message.chat.id,
-            text="<b>Please Reply To A Valid File</b>",
+            text="<b>❌ Only Video, Audio & Files are supported</b>",
             parse_mode=ParseMode.HTML
         )
         return
@@ -245,7 +245,7 @@ async def handle_file_download(message: Message, bot: Bot):
         await bot.edit_message_text(
             chat_id=processing_msg.chat.id,
             message_id=processing_msg.message_id,
-            text=f"<b>Error: Failed to generate link - {str(e)}</b>",
+            text=f"<b>❌ Only Video, Audio & Files are supported</b>",
             parse_mode=ParseMode.HTML
         )
 
