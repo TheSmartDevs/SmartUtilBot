@@ -165,7 +165,7 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
             back_button.button(text="⬅️ Back", callback_data="second_menu")
         elif call.data in ["string_session", "stripe_keys", "sticker", "stylish_text", "time_date", "text_split", "translate", "tempmail", "text_ocr", "bot_users_export"]:
             back_button.button(text="⬅️ Back", callback_data="third_menu")
-        elif call.data in ["web_capture", "weather", "yt_tools"]:
+        elif call.data in ["web_capture", "weather", "yt_tools", "mail_tools"]:
             back_button.button(text="⬅️ Back", callback_data="fourth_menu")
         else:
             back_button.button(text="⬅️ Back", callback_data="main_menu")
