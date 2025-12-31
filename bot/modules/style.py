@@ -23,35 +23,35 @@ def load_fonts():
     global fonts
     try:
         if not FONTS_FILE.exists():
-            LOGGER.error(f"fonts.json file not found at {FONTS_FILE}")
+            LOGGER.error(f"❌ Could Not Load Fonts Database - File not found at {FONTS_FILE}")
             LOGGER.error(f"Absolute path checked: {FONTS_FILE.absolute()}")
             raise FileNotFoundError(f"fonts.json missing at {FONTS_FILE}")
-        
+
         with open(FONTS_FILE, "r", encoding="utf-8") as f:
             fonts = json.load(f)
-        
+
         if not fonts or not isinstance(fonts, list):
-            LOGGER.error(f"Invalid fonts data: Expected non-empty list, got {type(fonts)}")
+            LOGGER.error(f"❌ Could Not Load Fonts Database - Expected non-empty list, got {type(fonts)}")
             raise ValueError("fonts.json must contain a non-empty list")
-        
-        LOGGER.info(f"Successfully loaded {len(fonts)} fonts from {FONTS_FILE}")
+
         return True
-        
-    except FileNotFoundError as e:
-        LOGGER.error(f"Font file not found: {e}")
-        LOGGER.error("Please ensure fonts.json exists at bot/Assets/fonts.json")
+
+    except FileNotFoundError:
+        LOGGER.error("❌ Could Not Load Fonts Database - Please ensure fonts.json exists at bot/Assets/fonts.json")
         return False
     except json.JSONDecodeError as e:
-        LOGGER.error(f"Invalid JSON in fonts.json: {e}")
+        LOGGER.error(f"❌ Could Not Load Fonts Database - Invalid JSON: {e}")
         LOGGER.error(f"Error at line {e.lineno}, column {e.colno}")
         return False
     except ValueError as e:
-        LOGGER.error(f"Invalid font data structure: {e}")
+        LOGGER.error(f"❌ Could Not Load Fonts Database - Invalid font data structure: {e}")
         return False
     except Exception as e:
-        LOGGER.error(f"Unexpected error loading fonts: {e}")
+        LOGGER.error(f"❌ Could Not Load Fonts Database - Unexpected error: {e}")
         LOGGER.error(f"Error type: {type(e).__name__}")
         return False
+
+load_fonts()
 
 def convert_text(text: str, font_data: dict) -> str:
     lower = font_data.get("fontLower", "")
@@ -109,7 +109,7 @@ def get_keyboard(page: int = 0):
     total_pages = (len(fonts) + buttons_per_page - 1) // buttons_per_page
 
     buttons = SmartButtons()
-    
+
     for font in current_fonts:
         font_idx = fonts.index(font)
         btn_text = get_button_text(font)
@@ -139,7 +139,7 @@ def get_keyboard(page: int = 0):
 @SmartDefender
 async def cmd_style(message: Message, bot: Bot):
     LOGGER.info(f"Received /style command from user {message.from_user.id if message.from_user else 'Unknown'} in chat {message.chat.id}")
-    
+
     try:
         if not fonts:
             await send_message(
@@ -153,7 +153,7 @@ async def cmd_style(message: Message, bot: Bot):
 
         args = get_args(message)
         text = None
-        
+
         if message.reply_to_message:
             if args and args[0] == "{}":
                 text = message.reply_to_message.text or message.reply_to_message.caption
@@ -164,7 +164,7 @@ async def cmd_style(message: Message, bot: Bot):
         else:
             if args:
                 text = " ".join(args)
-        
+
         if not text:
             await send_message(
                 chat_id=message.chat.id,
@@ -190,15 +190,15 @@ async def cmd_style(message: Message, bot: Bot):
             reply_markup=kb,
             parse_mode=ParseMode.HTML
         )
-        
+
         if sent_message:
             user_key = f"{message.chat.id}_{sent_message.message_id}"
             user_original_texts[user_key] = text
             user_current_pages[user_key] = 0
             user_current_fonts[user_key] = None
-            
+
             LOGGER.info(f"User {message.from_user.id} requested style menu for text: {text[:50]}{'...' if len(text)>50 else ''}")
-    
+
     except Exception as e:
         LOGGER.error(f"Error in /style command: {e}")
         await Smart_Notify(bot, "style", e, message)
@@ -214,9 +214,9 @@ async def process_pagination(callback: CallbackQuery):
         page = int(callback.data.split("_")[1])
         user_key = f"{callback.message.chat.id}_{callback.message.message_id}"
         user_current_pages[user_key] = page
-        
+
         kb = get_keyboard(page)
-        
+
         await callback.message.edit_reply_markup(reply_markup=kb)
         await callback.answer(f"📄 Navigated To Page {page + 1}", show_alert=False)
         LOGGER.info(f"User {callback.from_user.id} navigated to page {page}")
@@ -228,11 +228,11 @@ async def process_pagination(callback: CallbackQuery):
 async def process_font_selection(callback: CallbackQuery):
     try:
         font_idx = int(callback.data.split("_")[1])
-        
+
         if font_idx < 0 or font_idx >= len(fonts):
             await callback.answer("❌ Invalid Font Selected!", show_alert=True)
             return
-        
+
         font_data = fonts[font_idx]
         font_name = font_data["fontName"]
 
@@ -240,22 +240,22 @@ async def process_font_selection(callback: CallbackQuery):
         original_text = user_original_texts.get(user_key)
         current_page = user_current_pages.get(user_key, 0)
         current_font_idx = user_current_fonts.get(user_key)
-        
+
         if current_font_idx == font_idx:
             await callback.answer(f"Bro Already Applied {font_name} Style ❌", show_alert=True)
             LOGGER.info(f"User {callback.from_user.id} tried to reapply font '{font_name}'")
             return
-        
+
         if not original_text:
             current_text = callback.message.text or callback.message.caption or ""
-            
+
             if "\n\n<b>Click To Copy 👆</b>" in current_text:
                 original_text = current_text.split("\n\n<b>Click To Copy 👆</b>")[0]
             else:
                 original_text = current_text
-            
+
             original_text = original_text.replace("<code>", "").replace("</code>", "").strip()
-            
+
             if original_text:
                 user_original_texts[user_key] = original_text
 
@@ -274,12 +274,12 @@ async def process_font_selection(callback: CallbackQuery):
             reply_markup=kb,
             parse_mode=ParseMode.HTML
         )
-        
+
         user_current_fonts[user_key] = font_idx
-        
+
         await callback.answer(f"✨ {font_name} Style Applied!", show_alert=False)
         LOGGER.info(f"User {callback.from_user.id} switched to font '{font_name}'")
-        
+
     except Exception as e:
         LOGGER.error(f"Error editing message: {e}")
         await callback.answer("❌ Sorry Failed to apply style!", show_alert=True)
@@ -287,14 +287,14 @@ async def process_font_selection(callback: CallbackQuery):
 @dp.callback_query(F.data == "close_style")
 async def process_close(callback: CallbackQuery):
     user_key = f"{callback.message.chat.id}_{callback.message.message_id}"
-    
+
     if user_key in user_original_texts:
         del user_original_texts[user_key]
     if user_key in user_current_pages:
         del user_current_pages[user_key]
     if user_key in user_current_fonts:
         del user_current_fonts[user_key]
-    
+
     try:
         await delete_messages(callback.message.chat.id, callback.message.message_id)
         await callback.answer("👋 Menu Successfully Closed!", show_alert=False)
@@ -302,9 +302,3 @@ async def process_close(callback: CallbackQuery):
     except Exception as e:
         LOGGER.error(f"Error deleting message: {e}")
         await callback.answer("❌ Failed to close menu!", show_alert=True)
-
-fonts_loaded = load_fonts()
-if fonts_loaded:
-    LOGGER.info("✅ Font Style module loaded successfully")
-else:
-    LOGGER.error("❌ Font Style module loaded with errors - /style command will be unavailable")
