@@ -70,6 +70,7 @@ third_menu_keyboard.button(text="User Export", callback_data="bot_users_export")
 third_menu_keyboard.button(text="Previous ⬅️", callback_data="previous_2")
 third_menu_keyboard.button(text="Next ➡️", callback_data="next_3")
 third_menu_keyboard.button(text="Close ❌", callback_data="close")
+
 third_menu_keyboard = third_menu_keyboard.build_menu(b_cols=2, h_cols=1, f_cols=2)
 
 
@@ -79,11 +80,12 @@ fourth_menu_keyboard.button(text="Web Capture", callback_data="web_capture")
 fourth_menu_keyboard.button(text="Weather", callback_data="weather")
 
 fourth_menu_keyboard.button(text="YT Tools", callback_data="yt_tools")
-fourth_menu_keyboard.button(text="Previous ⬅️", callback_data="previous_3")
+fourth_menu_keyboard.button(text="Mail Utils", callback_data="mail_tools")
 
-fourth_menu_keyboard.button(text="Close ❌", callback_data="close")
+fourth_menu_keyboard.button(text="Previous ⬅️", callback_data="previous_3", position="footer")
+fourth_menu_keyboard.button(text="Close ❌", callback_data="close", position="footer")
 
-fourth_menu_keyboard = fourth_menu_keyboard.build_menu(b_cols=2, h_cols=1, f_cols=1)
+fourth_menu_keyboard = fourth_menu_keyboard.build_menu(b_cols=2, h_cols=1, f_cols=2)
 
 responses = {
     "ai_tools": (
