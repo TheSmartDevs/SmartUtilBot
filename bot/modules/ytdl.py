@@ -5,6 +5,7 @@ import math
 import time
 import asyncio
 import aiohttp
+import html
 from pathlib import Path
 from typing import Optional, Tuple, Dict
 from concurrent.futures import ThreadPoolExecutor
@@ -61,7 +62,7 @@ def sanitize_filename(title: str) -> str:
     return title
 
 def generate_temp_id() -> str:
-    return str(int(time.time() * 1000) % 100000)
+    return str(int(time.time() * 1000) % 1000000)
 
 def format_size(size_bytes: int) -> str:
     if not size_bytes:
@@ -210,17 +211,17 @@ async def download_thumbnail(thumbnail_url: str, output_path: str) -> Optional[s
 async def download_media_file(url: str, is_audio: bool, temp_id: str) -> Optional[str]:
     temp_dir = DLConfig.TEMP_DIR / temp_id
     temp_dir.mkdir(exist_ok=True)
-    
+
     output_path = str(temp_dir / "media")
     opts = get_ydl_opts(output_path, is_audio)
-    
+
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             await asyncio.get_event_loop().run_in_executor(executor, ydl.download, [url])
-        
+
         expected_ext = 'mp3' if is_audio else 'mp4'
         file_path = f"{output_path}.{expected_ext}"
-        
+
         if not os.path.exists(file_path):
             for ext in ['.mp3', '.m4a', '.webm', '.mkv', '.mp4']:
                 alt_path = f"{output_path}{ext}"
@@ -231,7 +232,7 @@ async def download_media_file(url: str, is_audio: bool, temp_id: str) -> Optiona
                     else:
                         file_path = alt_path
                         break
-        
+
         return file_path if os.path.exists(file_path) else None
     except Exception as e:
         return None
@@ -246,14 +247,14 @@ async def download_media(url: str, is_audio: bool, status: Message, bot: Bot) ->
     try:
         temp_id = generate_temp_id()
         video_id = extract_video_id(parsed_url)
-        
+
         if not video_id:
             await status.edit_text("<b>Invalid YouTube ID Or URL</b>", parse_mode=ParseMode.HTML)
             await Smart_Notify(bot, f"{BotCommands}yt", Exception("Invalid YouTube URL"), status)
             return None, "Invalid YouTube URL"
-        
+
         info = await fetch_video_metadata(video_id)
-        
+
         if not info:
             await status.edit_text(f"<b>Sorry Bro {'Audio' if is_audio else 'Video'} Not Found</b>", parse_mode=ParseMode.HTML)
             await Smart_Notify(bot, f"{BotCommands}yt", Exception("No media info found"), status)
@@ -261,7 +262,7 @@ async def download_media(url: str, is_audio: bool, status: Message, bot: Bot) ->
 
         duration_str = info.get('duration', '0:00')
         duration = parse_duration_to_seconds(duration_str)
-        
+
         if duration > DLConfig.MAX_DURATION:
             await status.edit_text(f"<b>Sorry Bro {'Audio' if is_audio else 'Video'} Is Over 2hrs</b>", parse_mode=ParseMode.HTML)
             await Smart_Notify(bot, f"{BotCommands}yt", Exception("Media duration exceeds 2 hours"), status)
@@ -271,16 +272,16 @@ async def download_media(url: str, is_audio: bool, status: Message, bot: Bot) ->
 
         title = info.get('title', 'Unknown')
         safe_title = sanitize_filename(title)
-        
+
         thumbnails = info.get('thumbnails', [])
         thumbnail_url = thumbnails[-1]['url'] if thumbnails else None
-        
+
         view_count_data = info.get('viewCount', {})
         view_count = parse_view_count(view_count_data.get('short', '0'))
-        
+
         thumbnail_task = asyncio.create_task(download_thumbnail(thumbnail_url, str(DLConfig.TEMP_DIR / temp_id / "thumb")))
         download_task = asyncio.create_task(download_media_file(parsed_url, is_audio, temp_id))
-        
+
         results = await asyncio.gather(thumbnail_task, download_task, return_exceptions=True)
         thumbnail_path = results[0] if not isinstance(results[0], Exception) else None
         file_path = results[1] if not isinstance(results[1], Exception) else None
@@ -328,12 +329,12 @@ async def search_youtube(query: str, retries: int = 2, bot: Bot = None) -> Optio
         try:
             src = Search(query, limit=1, language="en", region="US")
             data = await src.next()
-            
+
             if data and data.get('result') and len(data['result']) > 0:
                 result = data['result'][0]
                 if result.get('type') == 'video':
                     return result.get('link')
-            
+
             simplified_query = re.sub(r'[^\w\s]', '', query).strip()
             if simplified_query != query:
                 src = Search(simplified_query, limit=1, language="en", region="US")
@@ -380,12 +381,17 @@ async def handle_media_request(message: Message, bot: Bot, query: str, is_audio:
     if error:
         return
 
+    escaped_user_name = html.escape(user_name)
+
     user_info = (
-        f"<a href=\"tg://user?id={message.from_user.id}\">{user_name}</a>" if message.from_user
-        else f"<a href=\"https://t.me/{message.chat.username or 'this group'}\">{message.chat.title}</a>"
+        f"<a href=\"tg://user?id={message.from_user.id}\">{escaped_user_name}</a>" if message.from_user
+        else f"<a href=\"https://t.me/{message.chat.username or 'this group'}\">{html.escape(message.chat.title)}</a>"
     )
+
+    escaped_title = html.escape(result['title'])
+
     caption = (
-        f"🎵 <b>Title:</b> <code>{result['title']}</code>\n"
+        f"🎵 <b>Title:</b> <code>{escaped_title}</code>\n"
         f"<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
         f"👁️‍🗨️ <b>Views:</b> {result['views']}\n"
         f"<b>🔗 Url:</b> <a href=\"{video_url}\">Watch On YouTube</a>\n"
@@ -397,10 +403,10 @@ async def handle_media_request(message: Message, bot: Bot, query: str, is_audio:
     last_update_time = [0]
     start_time = time.time()
     send_func = SmartPyro.send_audio if is_audio else SmartPyro.send_video
-    
+
     file_ext = 'mp3' if is_audio else 'mp4'
     final_filename = f"{result['safe_title']}.{file_ext}"
-    
+
     kwargs = {
         'chat_id': message.chat.id,
         'caption': caption,
@@ -448,7 +454,7 @@ async def video_command(message: Message, bot: Bot):
         command_text = message.text.strip()
         query = ""
         for prefix in DLConfig.COMMAND_PREFIX:
-            for cmd in ["yt", "video"]:
+            for cmd in ["yt", "video", "mp4"]:
                 full_cmd = f"{prefix}{cmd}"
                 if command_text.startswith(full_cmd):
                     query = command_text[len(full_cmd):].strip()
