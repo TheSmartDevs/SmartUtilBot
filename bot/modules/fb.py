@@ -6,6 +6,7 @@ import json
 import aiohttp
 import aiofiles
 import math
+import html
 from pathlib import Path
 from typing import Optional
 from aiogram import Bot
@@ -13,6 +14,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.enums import ParseMode
 from pyrogram.enums import ParseMode as SmartParseMode
+from moviepy import VideoFileClip
 from bot import dp, SmartPyro
 from bot.helpers.utils import new_task, clean_download
 from bot.helpers.botutils import send_message, delete_messages, get_args
@@ -30,21 +32,6 @@ class Config:
     MAX_DURATION = 7200
     MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024
 Config.TEMP_DIR.mkdir(exist_ok=True)
-
-def parse_duration_to_seconds(duration_str: str) -> int:
-    try:
-        parts = duration_str.split(':')
-        if len(parts) == 3:
-            hours, minutes, seconds = map(int, parts)
-            return hours * 3600 + minutes * 60 + seconds
-        elif len(parts) == 2:
-            minutes, seconds = map(int, parts)
-            return minutes * 60 + seconds
-        elif len(parts) == 1:
-            return int(parts[0])
-        return 0
-    except:
-        return 0
 
 def format_duration(seconds: int) -> str:
     if seconds == 0:
@@ -65,12 +52,14 @@ def format_size(size_bytes: int) -> str:
     i = int(math.log(size_bytes, 1024)) if size_bytes > 0 else 0
     return f"{round(size_bytes / (1024 ** i), 2)} {units[i]}"
 
-def extract_duration_from_efg(efg_str: str) -> int:
+def get_video_duration_moviepy(video_path: str) -> int:
     try:
-        efg_json = json.loads(efg_str)
-        duration = efg_json.get('duration_s', 0)
-        return int(duration) if duration else 0
-    except:
+        clip = VideoFileClip(video_path)
+        duration = int(clip.duration)
+        clip.close()
+        return duration
+    except Exception as e:
+        logger.error(f"Error getting video duration with moviepy: {e}")
         return 0
 
 class FacebookDownloader:
@@ -142,21 +131,10 @@ class FacebookDownloader:
                             logger.warning(f"Thumbnail download failed: {e}")
                             thumbnail_filename = None
 
-                    duration_seconds = 0
-                    for link in video_links:
-                        efg_str = link.get("efg", "")
-                        if efg_str:
-                            duration_seconds = extract_duration_from_efg(efg_str)
-                            if duration_seconds > 0:
-                                break
-                    
-                    if duration_seconds == 0:
-                        duration_from_data = data.get("duration", "0")
-                        if isinstance(duration_from_data, (int, float)):
-                            duration_seconds = int(duration_from_data)
-                        elif isinstance(duration_from_data, str):
-                            duration_seconds = parse_duration_to_seconds(duration_from_data)
-                    
+                    duration_seconds = await asyncio.get_event_loop().run_in_executor(
+                        None, get_video_duration_moviepy, str(video_filename)
+                    )
+
                     if duration_seconds > Config.MAX_DURATION:
                         await downloading_message.edit_text("<b>Sorry Bro Video Is Over 2hrs</b>", parse_mode=ParseMode.HTML)
                         clean_download(str(video_filename))
@@ -228,14 +206,18 @@ async def fb_handler(message: Message, bot: Bot):
         duration_seconds = video_info['duration_seconds']
 
         if message.from_user:
-            last_name_part = ' ' + message.from_user.last_name if message.from_user.last_name else ''
+            first_name = html.escape(message.from_user.first_name)
+            last_name = html.escape(message.from_user.last_name) if message.from_user.last_name else ''
+            last_name_part = ' ' + last_name if last_name else ''
             user_link = f"tg://user?id={message.from_user.id}"
-            user_info = f"<a href=\"{user_link}\">{message.from_user.first_name}{last_name_part}</a>"
+            user_info = f"<a href=\"{user_link}\">{first_name}{last_name_part}</a>"
         else:
-            user_info = message.chat.title
+            user_info = html.escape(message.chat.title)
+
+        escaped_title = html.escape(title)
 
         caption = (
-            f"📹 <b>Title:</b> <code>{title}</code>\n"
+            f"📹 <b>Title:</b> {escaped_title}\n"
             f"<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
             f"<b>🔗 Url:</b> <a href=\"{webpage_url}\">Watch On Facebook</a>\n"
             f"<b>⏱️ Duration:</b> {duration_str}\n"
@@ -257,10 +239,10 @@ async def fb_handler(message: Message, bot: Bot):
             'progress': progress_bar,
             'progress_args': (downloading_message, start_time, last_update_time)
         }
-        
+
         if duration_seconds > 0:
             send_video_params['duration'] = int(duration_seconds)
-        
+
         if thumbnail:
             send_video_params['thumb'] = thumbnail
 
