@@ -17,6 +17,7 @@ aiofiles
 python-dotenv
 psutil
 pydub
+moviepy
 speedtest-cli
 py-yt-search
 lxml
