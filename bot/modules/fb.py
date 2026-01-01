@@ -2,6 +2,7 @@ import os
 import re
 import asyncio
 import time
+import json
 import aiohttp
 import aiofiles
 import math
@@ -63,6 +64,14 @@ def format_size(size_bytes: int) -> str:
     units = ("B", "KB", "MB", "GB")
     i = int(math.log(size_bytes, 1024)) if size_bytes > 0 else 0
     return f"{round(size_bytes / (1024 ** i), 2)} {units[i]}"
+
+def extract_duration_from_efg(efg_str: str) -> int:
+    try:
+        efg_json = json.loads(efg_str)
+        duration = efg_json.get('duration_s', 0)
+        return int(duration) if duration else 0
+    except:
+        return 0
 
 class FacebookDownloader:
     async def sanitize_filename(self, title: str) -> str:
@@ -134,13 +143,20 @@ class FacebookDownloader:
                             thumbnail_filename = None
 
                     duration_seconds = 0
-                    duration_str = "Live"
                     for link in video_links:
-                        if "duration_s" in link.get("efg", "") or link.get("url", "").find("duration_s") != -1:
-                            duration_seconds = int(link.get("duration_s", 0))
-                            break
+                        efg_str = link.get("efg", "")
+                        if efg_str:
+                            duration_seconds = extract_duration_from_efg(efg_str)
+                            if duration_seconds > 0:
+                                break
+                    
                     if duration_seconds == 0:
-                        duration_seconds = parse_duration_to_seconds(data.get("duration", "0"))
+                        duration_from_data = data.get("duration", "0")
+                        if isinstance(duration_from_data, (int, float)):
+                            duration_seconds = int(duration_from_data)
+                        elif isinstance(duration_from_data, str):
+                            duration_seconds = parse_duration_to_seconds(duration_from_data)
+                    
                     if duration_seconds > Config.MAX_DURATION:
                         await downloading_message.edit_text("<b>Sorry Bro Video Is Over 2hrs</b>", parse_mode=ParseMode.HTML)
                         clean_download(str(video_filename))
@@ -236,12 +252,15 @@ async def fb_handler(message: Message, bot: Bot):
             'supports_streaming': True,
             'caption': caption,
             'parse_mode': SmartParseMode.HTML,
-            'duration': float(duration_seconds) if duration_seconds > 0 else None,
             'width': 1280,
             'height': 720,
             'progress': progress_bar,
             'progress_args': (downloading_message, start_time, last_update_time)
         }
+        
+        if duration_seconds > 0:
+            send_video_params['duration'] = int(duration_seconds)
+        
         if thumbnail:
             send_video_params['thumb'] = thumbnail
 
