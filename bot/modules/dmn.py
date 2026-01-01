@@ -16,7 +16,15 @@ from config import A360APIBASEURL, DOMAIN_CHK_LIMIT
 
 logger = LOGGER
 
-async def get_domain_info(domain: str, bot: Bot) -> str:
+def format_date(date_str: str) -> str:
+    if not date_str or date_str == "Unknown":
+        return "Unknown"
+    try:
+        return date_str.split('T')[0]
+    except Exception:
+        return date_str
+
+async def get_domain_info(domain: str, bot: Bot) -> dict:
     url = f"{A360APIBASEURL}/dmn"
     params = {"domain": domain}
     try:
@@ -25,36 +33,38 @@ async def get_domain_info(domain: str, bot: Bot) -> str:
                 response.raise_for_status()
                 data = await response.json()
                 logger.info(f"Response for domain {domain}: {data}")
-                domain_name = data.get("domain", domain)
-                if data.get("registered_on") is None:
-                    return (
-                        f"<b>Smart A360 Domain Check Results...✅</b>\n"
-                        f"<b>━━━━━━━━━━━━━━━━━━</b>\n"
-                        f"<b>Domain : </b><code>{html.escape(domain_name)}</code>\n"
-                        f"<b>Congrats !🥳 This Domain Is Available. ✅</b>\n"
-                        f"<b>━━━━━━━━━━━━━━━━━━</b>"
-                    )
-                else:
-                    registrar = data.get("registrar", "Unknown")
-                    registered_on = data.get("registered_on", "Unknown")
-                    expires_on = data.get("expires_on", "Unknown")
-                    return (
-                        f"<b>Smart A360 Domain Check Results...✅</b>\n"
-                        f"<b>━━━━━━━━━━━━━━━━━━</b>\n"
-                        f"<b>Domain : </b><code>{html.escape(domain_name)}</code>\n"
-                        f"<b>Registrar : </b><code>{html.escape(registrar)}</code>\n"
-                        f"<b>Registration Date : </b><code>{html.escape(registered_on)}</code>\n"
-                        f"<b>Expiration Date : </b><code>{html.escape(expires_on)}</code>\n"
-                        f"<b>━━━━━━━━━━━━━━━━━━</b>"
-                    )
+                return data
     except aiohttp.ClientError as e:
         logger.error(f"Failed to fetch info for domain {domain}: {e}")
         await Smart_Notify(bot, "/dmn", e, None)
-        return f"<b>❌ Sorry Bro Domain API Dead</b>"
+        return None
     except Exception as e:
         logger.error(f"Exception occurred while fetching info for domain {domain}: {e}")
         await Smart_Notify(bot, "/dmn", e, None)
-        return f"<b>❌ Sorry Bro Domain Check API Dead</b>"
+        return None
+
+def format_single_domain(data: dict, domain: str) -> str:
+    if not data:
+        return f"<b>Domain Name:</b> {html.escape(domain)}\n<b>Status:</b> <i>Failed to fetch data</i> ❌\n"
+    
+    domain_name = data.get("domain", domain)
+    registered_on = data.get("registered_on")
+    
+    if not registered_on or registered_on == "Unknown":
+        return f"<b>Domain Name:</b> {html.escape(domain_name)}\n<b>Registration Status:</b> <i>Available</i> ✅\n"
+    else:
+        registrar = data.get("registrar", "Unknown")
+        expires_on = data.get("expires_on", "Unknown")
+        
+        registered_formatted = format_date(registered_on)
+        expires_formatted = format_date(expires_on)
+        
+        return (
+            f"<b>Domain Name:</b> {html.escape(domain_name)}\n"
+            f"<b>Registrar:</b> {html.escape(registrar)}\n"
+            f"<b>Registration Date:</b> {html.escape(registered_formatted)}\n"
+            f"<b>Expiration Date:</b> {html.escape(expires_formatted)}\n"
+        )
 
 @dp.message(Command(commands=["dmn", ".dmn"], prefix=BotCommands))
 @new_task
@@ -91,22 +101,21 @@ async def domain_info(message: Message, bot: Bot):
     )
     try:
         results = await asyncio.gather(*[get_domain_info(domain, bot) for domain in domains], return_exceptions=True)
-        result_message = []
+        
+        domain_results = []
         for domain, result in zip(domains, results):
             if isinstance(result, Exception):
                 logger.error(f"Error processing domain {domain}: {result}")
                 await Smart_Notify(bot, "/dmn", result, message)
-                result_message.append(f"<b>❌ {html.escape(domain)}: Failed to check domain</b>")
+                domain_results.append(f"<b>Domain Name:</b> {html.escape(domain)}\n<b>Status:</b> <i>Failed to check domain</i> ❌\n")
             else:
-                result_message.append(result)
-        if message.from_user:
-            user_full_name = f"{message.from_user.first_name} {message.from_user.last_name or ''}".strip()
-            user_info = f"\n<b>Domain Info Grab By :</b> <a href=\"tg://user?id={message.from_user.id}\">{html.escape(user_full_name)}</a>"
-        else:
-            group_name = message.chat.title or "this group"
-            group_url = f"https://t.me/{message.chat.username}" if message.chat.username else "this group"
-            user_info = f"\n<b>Domain Info Grab By :</b> <a href=\"{group_url}\">{html.escape(group_name)}</a>"
-        result_message = "\n\n".join(result_message) + user_info
+                domain_results.append(format_single_domain(result, domain))
+        
+        result_message = "🌐 <b>Domain Information</b>\n━━━━━━━━━━━━━━━━━━━━━━\n"
+        result_message += "".join(domain_results)
+        result_message += "━━━━━━━━━━━━━━━━━━━━━━\n"
+        result_message += "<b>Thanks For Using Smart Tool Domain Checker</b> 🙌"
+        
         try:
             await progress_message.edit_text(
                 text=result_message,
