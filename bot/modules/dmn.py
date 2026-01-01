@@ -1,5 +1,6 @@
 import aiohttp
 import asyncio
+import html
 from aiogram import Bot
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -29,7 +30,7 @@ async def get_domain_info(domain: str, bot: Bot) -> str:
                     return (
                         f"<b>Smart A360 Domain Check Results...✅</b>\n"
                         f"<b>━━━━━━━━━━━━━━━━━━</b>\n"
-                        f"<b>Domain : </b><code>{domain_name}</code>\n"
+                        f"<b>Domain : </b><code>{html.escape(domain_name)}</code>\n"
                         f"<b>Congrats !🥳 This Domain Is Available. ✅</b>\n"
                         f"<b>━━━━━━━━━━━━━━━━━━</b>"
                     )
@@ -40,10 +41,10 @@ async def get_domain_info(domain: str, bot: Bot) -> str:
                     return (
                         f"<b>Smart A360 Domain Check Results...✅</b>\n"
                         f"<b>━━━━━━━━━━━━━━━━━━</b>\n"
-                        f"<b>Domain : </b><code>{domain_name}</code>\n"
-                        f"<b>Registrar : </b><code>{registrar}</code>\n"
-                        f"<b>Registration Date : </b><code>{registered_on}</code>\n"
-                        f"<b>Expiration Date : </b><code>{expires_on}</code>\n"
+                        f"<b>Domain : </b><code>{html.escape(domain_name)}</code>\n"
+                        f"<b>Registrar : </b><code>{html.escape(registrar)}</code>\n"
+                        f"<b>Registration Date : </b><code>{html.escape(registered_on)}</code>\n"
+                        f"<b>Expiration Date : </b><code>{html.escape(expires_on)}</code>\n"
                         f"<b>━━━━━━━━━━━━━━━━━━</b>"
                     )
     except aiohttp.ClientError as e:
@@ -95,16 +96,16 @@ async def domain_info(message: Message, bot: Bot):
             if isinstance(result, Exception):
                 logger.error(f"Error processing domain {domain}: {result}")
                 await Smart_Notify(bot, "/dmn", result, message)
-                result_message.append(f"<b>❌ {domain}: Failed to check domain</b>")
+                result_message.append(f"<b>❌ {html.escape(domain)}: Failed to check domain</b>")
             else:
                 result_message.append(result)
         if message.from_user:
             user_full_name = f"{message.from_user.first_name} {message.from_user.last_name or ''}".strip()
-            user_info = f"\n<b>Domain Info Grab By :</b> <a href=\"tg://user?id={message.from_user.id}\">{user_full_name}</a>"
+            user_info = f"\n<b>Domain Info Grab By :</b> <a href=\"tg://user?id={message.from_user.id}\">{html.escape(user_full_name)}</a>"
         else:
             group_name = message.chat.title or "this group"
             group_url = f"https://t.me/{message.chat.username}" if message.chat.username else "this group"
-            user_info = f"\n<b>Domain Info Grab By :</b> <a href=\"{group_url}\">{group_name}</a>"
+            user_info = f"\n<b>Domain Info Grab By :</b> <a href=\"{group_url}\">{html.escape(group_name)}</a>"
         result_message = "\n\n".join(result_message) + user_info
         try:
             await progress_message.edit_text(
