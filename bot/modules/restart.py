@@ -12,6 +12,7 @@ from bot.helpers.botutils import send_message
 from bot.helpers.guard import admin_only
 from bot.core.database import SmartReboot
 from bot.helpers.logger import LOGGER
+from bot.helpers.commands import BotCommands
 from config import UPDATE_CHANNEL_URL
 
 async def cleanup_restart_data():
@@ -80,13 +81,13 @@ async def run_restart_task(bot: Bot, chat_id: int, status_message_id: int):
             LOGGER.info("Terminated SmartPyro session")
         except Exception as e:
             LOGGER.error(f"Failed to stop SmartPyro: {e}")
-        
+
         try:
             await SmartUserBot.stop()
             LOGGER.info("Terminated SmartUserBot session")
         except Exception as e:
             LOGGER.error(f"Failed to stop SmartUserBot: {e}")
-        
+
         try:
             await bot.session.close()
             LOGGER.info("Terminated SmartAIO session")
@@ -149,7 +150,7 @@ async def run_restart_task(bot: Bot, chat_id: int, status_message_id: int):
             parse_mode=SmartParseMode.HTML
         )
 
-@dp.message(Command(commands=["restart", "reboot", "reload"]))
+@dp.message(Command(commands=["restart", "reboot", "reload"], prefix=BotCommands))
 @validate_message
 @admin_only
 async def restart_handler(message: Message, bot: Bot):
@@ -177,7 +178,7 @@ async def restart_handler(message: Message, bot: Bot):
             parse_mode=SmartParseMode.HTML
         )
 
-@dp.message(Command(commands=["stop", "kill", "off"]))
+@dp.message(Command(commands=["stop", "kill", "off"], prefix=BotCommands))
 @validate_message
 @admin_only
 async def stop_handler(message: Message, bot: Bot):
@@ -205,19 +206,19 @@ async def stop_handler(message: Message, bot: Bot):
                 LOGGER.error(f"Failed to clear log file {log_file}: {e}")
 
         await cleanup_restart_data()
-        
+
         try:
             await SmartPyro.stop()
             LOGGER.info("Terminated SmartPyro session")
         except Exception as e:
             LOGGER.error(f"Failed to stop SmartPyro: {e}")
-        
+
         try:
             await SmartUserBot.stop()
             LOGGER.info("Terminated SmartUserBot session")
         except Exception as e:
             LOGGER.error(f"Failed to stop SmartUserBot: {e}")
-        
+
         try:
             await bot.session.close()
             LOGGER.info("Terminated SmartAIO session")
