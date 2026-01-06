@@ -1,6 +1,3 @@
-# Copyright @ISmartCoder
-#  SmartUtilBot - Telegram Utility Bot for Smart Features Bot 
-#  Copyright (C) 2024-present Abir Arafat Chawdhury <https://github.com/abirxdhack> 
 import os
 import re
 import time
@@ -83,6 +80,7 @@ class PinterestDownloader:
             ) as session:
                 async with session.get(api_url) as response:
                     LOGGER.info(f"API request to {api_url} returned status {response.status}")
+                    
                     if response.status != 200:
                         LOGGER.error(f"API request failed: HTTP status {response.status}")
                         return None
@@ -95,27 +93,32 @@ class PinterestDownloader:
                         return None
                     
                     await downloading_message.edit_text(
-                        "<b>Found ☑️ Downloading...</b>",
+                        "Found ☑️ Downloading...",
                         parse_mode=SmartParseMode.HTML
                     )
                     
                     media = data.get("media", [])
                     title = data.get("title", "Pinterest Media")
                     
-                    high_quality_video = None
+                    video_url = None
                     thumbnail_url = None
                     image_url = None
                     
                     for item in media:
-                        if item.get("type") == "video/mp4" and (not high_quality_video or "720p" in item.get("quality", "")):
-                            high_quality_video = item.get("url")
-                        elif item.get("type") == "image/jpeg":
-                            if item.get("quality") == "Thumbnail":
-                                thumbnail_url = item.get("url")
+                        item_type = item.get("type", "")
+                        item_quality = item.get("quality", "")
+                        item_url = item.get("url", "")
+                        
+                        if item_type == "video/mp4":
+                            if not video_url or "720p" in item_quality.lower():
+                                video_url = item_url
+                        elif item_type == "image/jpeg":
+                            if "thumbnail" in item_quality.lower():
+                                thumbnail_url = item_url
                             else:
-                                image_url = item.get("url")
+                                image_url = item_url
                     
-                    if not high_quality_video and not image_url and not thumbnail_url:
+                    if not video_url and not image_url and not thumbnail_url:
                         LOGGER.error("No suitable media found in API response")
                         return None
                     
@@ -125,28 +128,26 @@ class PinterestDownloader:
                         'webpage_url': url
                     }
                     
-                    if high_quality_video:
+                    if video_url:
                         video_filename = self.temp_dir / f"{safe_title}.mp4"
-                        await self.download_file(session, high_quality_video, video_filename)
+                        await self.download_file(session, video_url, video_filename)
                         result['video_filename'] = str(video_filename)
                         
                         if thumbnail_url:
                             thumbnail_filename = self.temp_dir / f"{safe_title}_thumb.jpg"
                             await self.download_file(session, thumbnail_url, thumbnail_filename)
                             result['thumbnail_filename'] = str(thumbnail_filename)
-                    
                     elif image_url:
                         image_filename = self.temp_dir / f"{safe_title}.jpg"
                         await self.download_file(session, image_url, image_filename)
                         result['image_filename'] = str(image_filename)
-                    
                     elif thumbnail_url:
                         image_filename = self.temp_dir / f"{safe_title}.jpg"
                         await self.download_file(session, thumbnail_url, image_filename)
                         result['image_filename'] = str(image_filename)
                     
                     return result
-        
+                    
         except Exception as e:
             LOGGER.error(f"Pinterest download error: {e}")
             return None
@@ -162,19 +163,21 @@ async def pinterest_handler(message: Message, bot: Bot):
         url = None
         args = get_args(message)
         
+        pinterest_pattern = r"https?://(?:www\.)?(?:pinterest\.com|pin\.it|[a-z]{2}\.pinterest\.com)/[^\s]+"
+        
         if args:
-            match = re.search(r"https?://(pin\.it|in\.pinterest\.com|www\.pinterest\.com)/\S+", args[0])
+            match = re.search(pinterest_pattern, args[0])
             if match:
                 url = match.group(0)
         elif message.reply_to_message and message.reply_to_message.text:
-            match = re.search(r"https?://(pin\.it|in\.pinterest\.com|www\.pinterest\.com)/\S+", message.reply_to_message.text)
+            match = re.search(pinterest_pattern, message.reply_to_message.text)
             if match:
                 url = match.group(0)
         
         if not url:
             progress_message = await send_message(
                 chat_id=message.chat.id,
-                text="<b>Please provide a valid Pinterest URL or reply to a message with one ❌</b>",
+                text="Please provide a valid Pinterest URL or reply to a message with one ❌",
                 parse_mode=SmartParseMode.HTML
             )
             LOGGER.info(f"No Pinterest URL provided in chat {message.chat.id}")
@@ -184,7 +187,7 @@ async def pinterest_handler(message: Message, bot: Bot):
         
         progress_message = await send_message(
             chat_id=message.chat.id,
-            text="<b>🔍 Searching The Media...</b>",
+            text="🔍 Searching The Media...",
             parse_mode=SmartParseMode.HTML
         )
         
@@ -195,14 +198,14 @@ async def pinterest_handler(message: Message, bot: Bot):
             await delete_messages(message.chat.id, progress_message.message_id)
             await send_message(
                 chat_id=message.chat.id,
-                text="<b>Unable To Extract The URL 😕</b>",
+                text="Unable To Extract The URL 😕",
                 parse_mode=SmartParseMode.HTML
             )
             LOGGER.error(f"Failed to download media for URL: {url}")
             return
         
         await progress_message.edit_text(
-            "<code>📤 Uploading...</code>",
+            "`📤 Uploading...`",
             parse_mode=SmartParseMode.HTML
         )
         
@@ -224,7 +227,6 @@ async def pinterest_handler(message: Message, bot: Bot):
                     progress=progress_bar,
                     progress_args=(progress_message, start_time, last_update_time)
                 )
-            
             elif 'image_filename' in media_info:
                 await SmartPyro.send_photo(
                     chat_id=message.chat.id,
@@ -237,9 +239,10 @@ async def pinterest_handler(message: Message, bot: Bot):
         except Exception as e:
             LOGGER.error(f"Error uploading Pinterest media in chat {message.chat.id}: {str(e)}")
             await Smart_Notify(bot, "pinterest", e, message)
+            
             try:
                 await progress_message.edit_text(
-                    text="<b>❌ Sorry, failed to upload media</b>",
+                    text="❌ Sorry, failed to upload media",
                     parse_mode=SmartParseMode.HTML
                 )
                 LOGGER.info(f"Edited progress message with upload error in chat {message.chat.id}")
@@ -248,11 +251,10 @@ async def pinterest_handler(message: Message, bot: Bot):
                 await Smart_Notify(bot, "pinterest", edit_e, message)
                 await send_message(
                     chat_id=message.chat.id,
-                    text="<b>❌ Sorry, failed to upload media</b>",
+                    text="❌ Sorry, failed to upload media",
                     parse_mode=SmartParseMode.HTML
                 )
                 LOGGER.info(f"Sent upload error message to chat {message.chat.id}")
-        
         finally:
             for key in ['video_filename', 'thumbnail_filename', 'image_filename']:
                 if key in media_info and os.path.exists(media_info[key]):
@@ -266,7 +268,7 @@ async def pinterest_handler(message: Message, bot: Bot):
         if progress_message:
             try:
                 await progress_message.edit_text(
-                    text="<b>❌ Sorry, failed to process Pinterest URL</b>",
+                    text="❌ Sorry, failed to process Pinterest URL",
                     parse_mode=SmartParseMode.HTML
                 )
                 LOGGER.info(f"Edited progress message with error in chat {message.chat.id}")
@@ -275,14 +277,14 @@ async def pinterest_handler(message: Message, bot: Bot):
                 await Smart_Notify(bot, "pinterest", edit_e, message)
                 await send_message(
                     chat_id=message.chat.id,
-                    text="<b>❌ Sorry, failed to process Pinterest URL</b>",
+                    text="❌ Sorry, failed to process Pinterest URL",
                     parse_mode=SmartParseMode.HTML
                 )
                 LOGGER.info(f"Sent error message to chat {message.chat.id}")
         else:
             await send_message(
                 chat_id=message.chat.id,
-                text="<b>❌ Sorry, failed to process Pinterest URL</b>",
+                text="❌ Sorry, failed to process Pinterest URL",
                 parse_mode=SmartParseMode.HTML
             )
             LOGGER.info(f"Sent error message to chat {message.chat.id}")
