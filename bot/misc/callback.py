@@ -3,6 +3,7 @@ import time
 import subprocess
 from datetime import datetime, timedelta
 import psutil
+import asyncio
 from aiogram import Bot
 from aiogram.types import CallbackQuery
 from aiogram.enums import ParseMode
@@ -14,6 +15,28 @@ from bot.helpers.logger import LOGGER
 from bot.core.mongo import SmartUsers
 from config import UPDATE_CHANNEL_URL
 import html
+
+async def measure_network_speed():
+    try:
+        def run_speedtest():
+            try:
+                import speedtest
+                st = speedtest.Speedtest()
+                st.get_best_server()
+                download_bps = st.download()
+                upload_bps = st.upload()
+                download_mbps = download_bps / 1_000_000
+                upload_mbps = upload_bps / 1_000_000
+                return f"{download_mbps:.2f} Mbps", f"{upload_mbps:.2f} Mbps"
+            except Exception as e:
+                return "Error", "Error"
+
+        download_speed, upload_speed = await asyncio.to_thread(run_speedtest)
+        if download_speed == "Error":
+            return "N/A", "N/A"
+        return download_speed, upload_speed
+    except Exception as e:
+        return "N/A", "N/A"
 
 async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
     call = callback_query
@@ -113,8 +136,12 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
         try:
             ping_output = subprocess.getoutput("ping -c 1 google.com")
             ping = ping_output.split("time=")[1].split()[0] if "time=" in ping_output else "N/A"
+            if ping != "N/A":
+                ping += " ms"
         except:
             ping = "N/A"
+
+        download_speed, upload_speed = await measure_network_speed()
 
         disk = psutil.disk_usage('/')
         total_disk = disk.total / (2**30)
@@ -132,7 +159,8 @@ async def handle_callback_query(callback_query: CallbackQuery, bot: Bot):
             f"<b>🛜 Connectivity:</b>\n"
             f"<b>- Ping:</b> {ping}\n"
             f"<b>- Status:</b> Online\n"
-            f"<b>- CPU Load:</b> {cpu_percent}%\n\n"
+            f"<b>- Download:</b> {download_speed}\n"
+            f"<b>- Upload:</b> {upload_speed}\n\n"
             f"<b>💾 Server Storage:</b>\n"
             f"<b>- Total:</b> {total_disk:.2f} GB\n"
             f"<b>- Used:</b> {used_disk:.2f} GB\n"
