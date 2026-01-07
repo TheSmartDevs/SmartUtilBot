@@ -103,6 +103,9 @@ def parse_view_count(view_text: str) -> int:
     except:
         return 0
 
+def format_view_count(view_count: int) -> str:
+    return f"{view_count:,}"
+
 def youtube_parser(url: str) -> Optional[str]:
     youtube_patterns = [
         r"(?:youtube\.com/shorts/)([^\"&?/ ]{11})(\?.*)?",
@@ -272,6 +275,7 @@ async def download_media(url: str, is_audio: bool, status: Message, bot: Bot) ->
 
         title = info.get('title', 'Unknown')
         safe_title = sanitize_filename(title)
+        channel = info.get('channel', {}).get('name', 'Unknown Artist')
 
         thumbnails = info.get('thumbnails', [])
         thumbnail_url = thumbnails[-1]['url'] if thumbnails else None
@@ -306,12 +310,13 @@ async def download_media(url: str, is_audio: bool, status: Message, bot: Bot) ->
             'file_path': file_path,
             'title': title,
             'safe_title': safe_title,
-            'views': view_count,
+            'views': format_view_count(view_count),
             'duration': format_duration(duration),
             'duration_seconds': duration,
             'file_size': format_size(file_size),
             'thumbnail_path': thumbnail_path,
-            'temp_id': temp_id
+            'temp_id': temp_id,
+            'performer': channel
         }
 
         return metadata, None
@@ -393,9 +398,9 @@ async def handle_media_request(message: Message, bot: Bot, query: str, is_audio:
     caption = (
         f"🎵 <b>Title:</b> <code>{escaped_title}</code>\n"
         f"<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
-        f"👁️‍🗨️ <b>Views:</b> {result['views']}\n"
+        f"👁️‍🗨️ <b>Views:</b> <b>{result['views']}</b>\n"
         f"<b>🔗 Url:</b> <a href=\"{video_url}\">Watch On YouTube</a>\n"
-        f"⏱️ <b>Duration:</b> {result['duration']}\n"
+        f"⏱️ <b>Duration:</b> <b>{result['duration']}</b>\n"
         f"<b>━━━━━━━━━━━━━━━━━━━━━</b>\n"
         f"<b>Downloaded By</b> {user_info}"
     )
@@ -417,7 +422,11 @@ async def handle_media_request(message: Message, bot: Bot, query: str, is_audio:
         'file_name': final_filename
     }
     if is_audio:
-        kwargs.update({'audio': result['file_path'], 'title': result['title']})
+        kwargs.update({
+            'audio': result['file_path'],
+            'title': result['title'],
+            'performer': result['performer']
+        })
     else:
         kwargs.update({
             'video': result['file_path'],
