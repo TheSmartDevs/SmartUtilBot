@@ -189,25 +189,36 @@ async def fetch_video_metadata(video_id: str) -> Optional[dict]:
     except Exception as e:
         return None
 
-async def download_thumbnail(thumbnail_url: str, output_path: str) -> Optional[str]:
-    if not thumbnail_url:
+async def download_thumbnail(video_id: str, output_path: str) -> Optional[str]:
+    if not video_id:
         return None
+    
+    thumbnail_urls = [
+        f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg",
+        f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+    ]
+    
     try:
         connector = aiohttp.TCPConnector(limit=10, ttl_dns_cache=300)
         timeout = aiohttp.ClientTimeout(total=30, connect=10)
         async with aiohttp.ClientSession(connector=connector, timeout=timeout, headers=DLConfig.HEADERS) as session:
-            async with session.get(thumbnail_url) as resp:
-                if resp.status != 200:
-                    return None
-                data = await resp.read()
-
-        thumbnail_path = f"{output_path}_thumb.jpg"
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            executor,
-            lambda: Image.open(io.BytesIO(data)).convert('RGB').save(thumbnail_path, "JPEG", quality=DLConfig.THUMBNAIL_QUALITY, optimize=True)
-        )
-        return thumbnail_path
+            for thumbnail_url in thumbnail_urls:
+                try:
+                    async with session.get(thumbnail_url) as resp:
+                        if resp.status == 200:
+                            data = await resp.read()
+                            
+                            thumbnail_path = f"{output_path}_thumb.jpg"
+                            loop = asyncio.get_event_loop()
+                            await loop.run_in_executor(
+                                executor,
+                                lambda: Image.open(io.BytesIO(data)).convert('RGB').save(thumbnail_path, "JPEG", quality=DLConfig.THUMBNAIL_QUALITY, optimize=True)
+                            )
+                            return thumbnail_path
+                except:
+                    continue
+        
+        return None
     except Exception as e:
         return None
 
@@ -277,13 +288,10 @@ async def download_media(url: str, is_audio: bool, status: Message, bot: Bot) ->
         safe_title = sanitize_filename(title)
         channel = info.get('channel', {}).get('name', 'Unknown Artist')
 
-        thumbnails = info.get('thumbnails', [])
-        thumbnail_url = thumbnails[-1]['url'] if thumbnails else None
-
         view_count_data = info.get('viewCount', {})
         view_count = parse_view_count(view_count_data.get('short', '0'))
 
-        thumbnail_task = asyncio.create_task(download_thumbnail(thumbnail_url, str(DLConfig.TEMP_DIR / temp_id / "thumb")))
+        thumbnail_task = asyncio.create_task(download_thumbnail(video_id, str(DLConfig.TEMP_DIR / temp_id / "thumb")))
         download_task = asyncio.create_task(download_media_file(parsed_url, is_audio, temp_id))
 
         results = await asyncio.gather(thumbnail_task, download_task, return_exceptions=True)
