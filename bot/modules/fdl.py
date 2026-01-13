@@ -1,5 +1,3 @@
-#Copyright @ISmartCoder
-#Updates Channel https://t.me/abirxdhackz 
 import asyncio
 import urllib.parse
 from datetime import datetime
@@ -18,7 +16,7 @@ from bot.helpers.logger import LOGGER
 from bot.helpers.notify import Smart_Notify
 from bot.helpers.buttons import SmartButtons
 from bot.helpers.defend import SmartDefender
-from config import LOG_CHANNEL_ID, FILE_API_URL
+from config import LOG_CHANNEL_ID, FILE_API_URL, FILE_WORKER_URL
 import aiohttp
 
 logger = LOGGER
@@ -203,23 +201,35 @@ async def handle_file_download(message: Message, bot: Bot):
         
         quoted_code = urllib.parse.quote(code)
         base_url = FILE_API_URL.rstrip('/')
-        download_link = f"{base_url}/dl/{message_id}?code={quoted_code}"
+        worker_url = FILE_WORKER_URL.rstrip('/')
+        
+        normal_download_link = f"{base_url}/dl/{message_id}?code={quoted_code}"
+        fastest_download_link = f"{worker_url}/dl/{message_id}?code={quoted_code}"
+        
         is_video = mime_type.startswith('video') or reply_message.video or reply_message.video_note
-        stream_link = f"{base_url}/dl/{message_id}?code={quoted_code}=stream" if is_video else None
+        normal_stream_link = f"{base_url}/dl/{message_id}?code={quoted_code}=stream" if is_video else None
+        fastest_stream_link = f"{worker_url}/dl/{message_id}?code={quoted_code}=stream" if is_video else None
+        
         smart_buttons = SmartButtons()
         if is_video:
-            smart_buttons.button("📥 Download", url=download_link)
-            smart_buttons.button("▶️ Stream", url=stream_link)
-            keyboard = smart_buttons.build_menu(b_cols=1)
+            smart_buttons.button("📥 Download", url=normal_download_link)
+            smart_buttons.button("⚡ Fast Download", url=fastest_download_link)
+            smart_buttons.button("▶️ Stream", url=normal_stream_link)
+            smart_buttons.button("⚡ Fast Stream", url=fastest_stream_link)
+            keyboard = smart_buttons.build_menu(b_cols=2)
         else:
-            smart_buttons.button("📥 Download", url=download_link)
-            keyboard = smart_buttons.build_menu(b_cols=1)
+            smart_buttons.button("📥 Download", url=normal_download_link)
+            smart_buttons.button("⚡ Fast Download", url=fastest_download_link)
+            keyboard = smart_buttons.build_menu(b_cols=2)
+        
         if is_video:
             response = (
                 f"<b>Video Name:</b> {file_name}\n"
                 f"<b>Size:</b> {await format_file_size(file_size)}\n\n"
-                f"<b>Download:</b> <code>{download_link}</code>\n\n"
-                f"<b>Stream:</b> <code>{stream_link}</code>\n\n"
+                f"<b>Normal Download:</b> <code>{normal_download_link}</code>\n\n"
+                f"<b>Normal Stream:</b> <code>{normal_stream_link}</code>\n\n"
+                f"<b>Fastest Download:</b> <code>{fastest_download_link}</code>\n\n"
+                f"<b>Fastest Stream:</b> <code>{fastest_stream_link}</code>\n\n"
                 f"<b>• Open in any browser or player.</b>\n"
                 f"<b>• Stream works on PC & Android browsers.</b>"
             )
@@ -227,9 +237,11 @@ async def handle_file_download(message: Message, bot: Bot):
             response = (
                 f"<b>File Name:</b> {file_name}\n"
                 f"<b>File Size:</b> {await format_file_size(file_size)}\n\n"
-                f"<b>File Link:</b> <code>{download_link}</code>\n\n"
-                f"<b>Use the link to download the file directly.</b>"
+                f"<b>Normal Download:</b> <code>{normal_download_link}</code>\n\n"
+                f"<b>Fastest Download:</b> <code>{fastest_download_link}</code>\n\n"
+                f"<b>Use the links to download the file directly.</b>"
             )
+        
         await bot.edit_message_text(
             chat_id=processing_msg.chat.id,
             message_id=processing_msg.message_id,
@@ -238,7 +250,7 @@ async def handle_file_download(message: Message, bot: Bot):
             reply_markup=keyboard,
             disable_web_page_preview=True
         )
-        logger.info(f"Generated links for message_id: {message_id}, telegram_file_id: {telegram_file_id}, download: {download_link}, stream: {stream_link}")
+        logger.info(f"Generated links for message_id: {message_id}, telegram_file_id: {telegram_file_id}")
     except Exception as e:
         logger.error(f"Error generating links, error: {str(e)}")
         await Smart_Notify(bot, f"{BotCommands}fdl", e, processing_msg)
