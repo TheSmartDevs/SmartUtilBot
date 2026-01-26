@@ -29,7 +29,7 @@ async def get_domain_info(domain: str, bot: Bot) -> dict:
     params = {"domain": domain}
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params) as response:
+            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as response:
                 response.raise_for_status()
                 data = await response.json()
                 logger.info(f"Response for domain {domain}: {data}")
@@ -45,26 +45,31 @@ async def get_domain_info(domain: str, bot: Bot) -> dict:
 
 def format_single_domain(data: dict, domain: str) -> str:
     if not data:
-        return f"<b>Domain Name:</b> {html.escape(domain)}\n<b>Status:</b> <i>Failed to fetch data</i> ❌\n"
+        return f"{html.escape(domain)} <b>Failed to fetch data</b> ❌\n\n"
     
     domain_name = data.get("domain", domain)
+    available = data.get("available", None)
+    
+    if available is True or available == "true":
+        return f"{html.escape(domain_name)} <b>Domain is available! ✅</b>\n\n"
+    
     registered_on = data.get("registered_on")
     
     if not registered_on or registered_on == "Unknown":
-        return f"<b>Domain Name:</b> {html.escape(domain_name)}\n<b>Registration Status:</b> <i>Available</i> ✅\n"
-    else:
-        registrar = data.get("registrar", "Unknown")
-        expires_on = data.get("expires_on", "Unknown")
-        
-        registered_formatted = format_date(registered_on)
-        expires_formatted = format_date(expires_on)
-        
-        return (
-            f"<b>Domain Name:</b> {html.escape(domain_name)}\n"
-            f"<b>Registrar:</b> {html.escape(registrar)}\n"
-            f"<b>Registration Date:</b> {html.escape(registered_formatted)}\n"
-            f"<b>Expiration Date:</b> {html.escape(expires_formatted)}\n"
-        )
+        return f"{html.escape(domain_name)} <b>Domain is available! ✅</b>\n\n"
+    
+    registrar = data.get("registrar", "Unknown")
+    expires_on = data.get("expires_on", "Unknown")
+    
+    registered_formatted = format_date(registered_on)
+    expires_formatted = format_date(expires_on)
+    
+    return (
+        f"<b>Domain:</b> {html.escape(domain_name)}\n"
+        f"<b>Registrar:</b> {html.escape(registrar)}\n"
+        f"<b>Registered:</b> {html.escape(registered_formatted)}\n"
+        f"<b>Expires:</b> {html.escape(expires_formatted)}\n\n"
+    )
 
 @dp.message(Command(commands=["dmn", ".dmn"], prefix=BotCommands))
 @new_task
@@ -77,8 +82,10 @@ async def domain_info(message: Message, bot: Bot):
             parse_mode=ParseMode.HTML
         )
         return
+    
     user_id = message.from_user.id
     logger.info(f"Command received from user {user_id} in chat {message.chat.id}: {message.text}")
+    
     domains = get_args(message)
     if not domains:
         await send_message(
@@ -87,6 +94,7 @@ async def domain_info(message: Message, bot: Bot):
             parse_mode=ParseMode.HTML
         )
         return
+    
     if len(domains) > DOMAIN_CHK_LIMIT:
         await send_message(
             chat_id=message.chat.id,
@@ -94,11 +102,13 @@ async def domain_info(message: Message, bot: Bot):
             parse_mode=ParseMode.HTML
         )
         return
+    
     progress_message = await send_message(
         chat_id=message.chat.id,
         text="<b>Fetching domain information...✨</b>",
         parse_mode=ParseMode.HTML
     )
+    
     try:
         results = await asyncio.gather(*[get_domain_info(domain, bot) for domain in domains], return_exceptions=True)
         
@@ -107,14 +117,11 @@ async def domain_info(message: Message, bot: Bot):
             if isinstance(result, Exception):
                 logger.error(f"Error processing domain {domain}: {result}")
                 await Smart_Notify(bot, "/dmn", result, message)
-                domain_results.append(f"<b>Domain Name:</b> {html.escape(domain)}\n<b>Status:</b> <i>Failed to check domain</i> ❌\n")
+                domain_results.append(f"{html.escape(domain)} <b>Failed to check domain</b> ❌\n\n")
             else:
                 domain_results.append(format_single_domain(result, domain))
         
-        result_message = "🌐 <b>Domain Information</b>\n━━━━━━━━━━━━━━━━━━━━━━\n"
-        result_message += "".join(domain_results)
-        result_message += "━━━━━━━━━━━━━━━━━━━━━━\n"
-        result_message += "<b>Thanks For Using Smart Tool Domain Checker</b> 🙌"
+        result_message = "".join(domain_results)
         
         try:
             await progress_message.edit_text(
